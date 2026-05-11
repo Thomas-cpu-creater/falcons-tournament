@@ -448,7 +448,7 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
             <strong style={{ color:"#4a6a9c" }}>Points:</strong> Win 3 · OT/SO Win 2 · OT/SO Loss 1 · SO Draw 1 · Loss 0
           </p>
           <p style={{ fontSize:10, color:"#3a5a8c" }}>
-            <strong style={{ color:"#4a6a9c" }}>Tiebreaker:</strong> Points → Head-to-head → Goal difference → Goals scored → Alphabetical
+            <strong style={{ color:"#4a6a9c" }}>Tiebreaker:</strong> Points → Head-to-head → Goal difference → Goals scored
           </p>
         </div>
       </div>
