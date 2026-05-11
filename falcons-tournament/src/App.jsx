@@ -569,7 +569,7 @@ function PlayoffProjectionPanel({ title, accent, teams, times }) {
 
 // ─── Main App ─────────────────────────────────────────────────
 const PHASES  = ["day1","day2","day3"];
-const PLABELS = ["Day 1 · Friday","Day 2","Day 3 · Playoffs"];
+const PLABELS = ["Day 1 · Friday","Day 2 · Saturday","Day 3 · Playoffs"];
 
 export default function HockeyTournament() {
   const [phase, setPhase] = useState("day1");
@@ -646,7 +646,6 @@ export default function HockeyTournament() {
       }
       const s = snapshot.val();
       if (s) {
-        if (s.phase)      setPhase(s.phase);
         if (s.g1)         setG1(s.g1);
         if (s.g2)         setG2(s.g2);
         if (s.gA)         setGA(s.gA);
@@ -667,7 +666,7 @@ export default function HockeyTournament() {
     if (!initialized) return;
     suppressUpdate.current = true;
     set(ref(db, 'tournament'), {
-      phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB
+      g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB
     }).catch(console.error);
   }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB]); // eslint-disable-line
 
