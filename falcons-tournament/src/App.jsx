@@ -86,6 +86,22 @@ const loser = g => {
   return null;
 };
 
+// ─── Head-to-head tiebreaker ────────────────────────────────────
+// Returns +1 if teamA beat teamB, -1 if teamB beat teamA, 0 if not played / draw
+function headToHead(teamA, teamB, games) {
+  const g = games.find(g =>
+    played(g) && (
+      (g.team1 === teamA && g.team2 === teamB) ||
+      (g.team1 === teamB && g.team2 === teamA)
+    )
+  );
+  if (!g) return 0;
+  const w = winner(g);
+  if (w === teamA) return 1;
+  if (w === teamB) return -1;
+  return 0; // SO draw
+}
+
 function calcStandings(teams, games) {
   const r = {};
   teams.forEach(t => r[t] = { team:t, pts:0, gp:0, w:0, otw:0, t:0, otl:0, l:0, gf:0, ga:0 });
@@ -95,19 +111,24 @@ function calcStandings(teams, games) {
     const [p, q] = [r[g.team1], r[g.team2]];
     p.gp++; q.gp++; p.gf += a; p.ga += b; q.gf += b; q.ga += a;
     if (a === b) {
-      // Equal scores — outcome decided by shootout
-      if (g.soResult === "tie")   { p.t++;   p.pts++;    q.t++;   q.pts++;    }
-      else if (g.soResult === "team1") { p.otw++; p.pts += 2; q.otl++; q.pts++; }
-      else if (g.soResult === "team2") { q.otw++; q.pts += 2; p.otl++; p.pts++; }
+      if (g.soResult === "tie")        { p.t++;   p.pts++;    q.t++;   q.pts++;    }
+      else if (g.soResult === "team1") { p.otw++; p.pts += 2; q.otl++; q.pts++;   }
+      else if (g.soResult === "team2") { q.otw++; q.pts += 2; p.otl++; p.pts++;   }
     } else if (a > b) {
       p.w++; p.pts += 3; q.l++;
     } else {
       q.w++; q.pts += 3; p.l++;
     }
   });
-  return Object.values(r).sort((a, b) =>
-    (b.pts - a.pts) || ((b.gf-b.ga)-(a.gf-a.ga)) || (b.gf-a.gf) || a.team.localeCompare(b.team, undefined, {numeric:true})
-  );
+  return Object.values(r).sort((a, b) => {
+    if (b.pts !== a.pts)                          return b.pts - a.pts;
+    const h2h = headToHead(b.team, a.team, games);
+    if (h2h !== 0)                                return h2h;
+    const gdDiff = (b.gf - b.ga) - (a.gf - a.ga);
+    if (gdDiff !== 0)                             return gdDiff;
+    if (b.gf !== a.gf)                            return b.gf - a.gf;
+    return a.team.localeCompare(b.team, undefined, {numeric:true});
+  });
 }
 
 const makePlayoffGames = (seeds, pfx, times) => {
@@ -422,6 +443,14 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
         ))}
         <p className="uppercase tracking-widest mb-2 mt-5" style={{ fontSize:9, color:"#3a5a8c", fontWeight:700 }}>Standings</p>
         <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} />
+        <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:4 }}>
+          <p style={{ fontSize:10, color:"#3a5a8c" }}>
+            <strong style={{ color:"#4a6a9c" }}>Points:</strong> Win 3 · OT/SO Win 2 · OT/SO Loss 1 · SO Draw 1 · Loss 0
+          </p>
+          <p style={{ fontSize:10, color:"#3a5a8c" }}>
+            <strong style={{ color:"#4a6a9c" }}>Tiebreaker:</strong> Points → Head-to-head → Goal difference → Goals scored → Alphabetical
+          </p>
+        </div>
       </div>
     </div>
   );
