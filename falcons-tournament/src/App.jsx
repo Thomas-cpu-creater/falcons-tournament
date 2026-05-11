@@ -991,6 +991,12 @@ export default function HockeyTournament() {
           return (
             <div>
               <div className="rounded-xl" style={{
+                background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)",
+                padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8", lineHeight:1.7
+              }}>
+                <strong style={{color:"#c8d8f0"}}>📋 Note:</strong> The first three games in Group B may be reordered to accommodate results from the late Friday games, ensuring well-rested players meet each other where possible.
+              </div>
+              <div className="rounded-xl" style={{
                 background:"rgba(100,160,255,0.05)", border:"1px solid rgba(100,160,255,0.1)",
                 padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8", lineHeight:1.7
               }}>
