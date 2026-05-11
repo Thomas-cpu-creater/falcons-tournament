@@ -1,17 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
-// ─── Paste your Firebase config here ────────────────────────────
-// You get this from the Firebase console when you create a web app.
-// Step-by-step instructions are in the setup guide.
 const firebaseConfig = {
-  apiKey:            "REPLACE_ME",
-  authDomain:        "REPLACE_ME",
-  databaseURL:       "REPLACE_ME",
-  projectId:         "REPLACE_ME",
-  storageBucket:     "REPLACE_ME",
-  messagingSenderId: "REPLACE_ME",
-  appId:             "REPLACE_ME",
+  apiKey:            "AIzaSyBXZwAh-Gb65IeJmt7Zx7UXx76VliksOqg",
+  authDomain:        "falcons-tournament-d851f.firebaseapp.com",
+  databaseURL:       "https://falcons-tournament-d851f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "falcons-tournament-d851f",
+  storageBucket:     "falcons-tournament-d851f.firebasestorage.app",
+  messagingSenderId: "91107240577",
+  appId:             "1:91107240577:web:ff346840b62dfd58ebfb80",
 };
 
 const app = initializeApp(firebaseConfig);
