@@ -605,12 +605,14 @@ export default function HockeyTournament() {
   const [resetInput, setResetInput]         = useState("");
 
   const clearGame = g => ({ ...g, s1:"", s2:"", ot:false, soResult:null });
+  const clearPlayoffGame = (g, i) =>
+    i >= 2 ? { ...g, s1:"", s2:"", ot:false, soResult:null, team1:null, team2:null } : clearGame(g);
+
   const clearAllScores = () => {
     setG1({ ...DAY1_G1, games: DAY1_G1.games.map(clearGame) });
     setG2({ ...DAY1_G2, games: DAY1_G2.games.map(clearGame) });
-    [setGA, setGB, setPA, setPB, setPC].forEach(set =>
-      set(p => ({ ...p, games: p.games.map(clearGame) }))
-    );
+    [setGA, setGB].forEach(set => set(p => ({ ...p, games: p.games.map(clearGame) })));
+    [setPA, setPB, setPC].forEach(set => set(p => ({ ...p, games: p.games.map(clearPlayoffGame) })));
     setShowResetModal(false);
     setResetInput("");
   };
