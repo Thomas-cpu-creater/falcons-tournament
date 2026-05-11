@@ -6,31 +6,31 @@ const PASSWORD = "FalconsU12";
 
 // ─── Hardcoded Day 1 schedule ───────────────────────────────────
 const DAY1_G1 = {
-  teams: ["Falcons sort", "Falcons grå", "Gdansk", "Utrecht Dragons", "Neuchâtel", "Bad Boyz 1"],
+  teams: ["Falcons Black", "Falcons Grey", "Stoczniowiec", "Utrecht Dragons", "Neuchâtel", "Bad Boyz Black"],
   games: [
-    { id:"g1_0", time:"07:00", team1:"Falcons sort",    team2:"Gdansk",          s1:"", s2:"", soResult:null },
-    { id:"g1_1", time:"07:40", team1:"Falcons grå",     team2:"Utrecht Dragons", s1:"", s2:"", soResult:null },
-    { id:"g1_2", time:"08:35", team1:"Neuchâtel",       team2:"Bad Boyz 1",      s1:"", s2:"", soResult:null },
-    { id:"g1_3", time:"09:15", team1:"Falcons sort",    team2:"Utrecht Dragons", s1:"", s2:"", soResult:null },
-    { id:"g1_4", time:"10:10", team1:"Falcons grå",     team2:"Gdansk",          s1:"", s2:"", soResult:null },
-    { id:"g1_5", time:"10:50", team1:"Falcons sort",    team2:"Neuchâtel",       s1:"", s2:"", soResult:null },
-    { id:"g1_6", time:"11:45", team1:"Utrecht Dragons", team2:"Bad Boyz 1",      s1:"", s2:"", soResult:null },
-    { id:"g1_7", time:"12:25", team1:"Gdansk",          team2:"Neuchâtel",       s1:"", s2:"", soResult:null },
-    { id:"g1_8", time:"13:20", team1:"Falcons grå",     team2:"Bad Boyz 1",      s1:"", s2:"", soResult:null },
+    { id:"g1_0", time:"07:00", team1:"Falcons Black",    team2:"Stoczniowiec",          s1:"", s2:"", soResult:null },
+    { id:"g1_1", time:"07:40", team1:"Falcons Grey",     team2:"Utrecht Dragons", s1:"", s2:"", soResult:null },
+    { id:"g1_2", time:"08:35", team1:"Neuchâtel",       team2:"Bad Boyz Black",      s1:"", s2:"", soResult:null },
+    { id:"g1_3", time:"09:15", team1:"Falcons Black",    team2:"Utrecht Dragons", s1:"", s2:"", soResult:null },
+    { id:"g1_4", time:"10:10", team1:"Falcons Grey",     team2:"Stoczniowiec",          s1:"", s2:"", soResult:null },
+    { id:"g1_5", time:"10:50", team1:"Falcons Black",    team2:"Neuchâtel",       s1:"", s2:"", soResult:null },
+    { id:"g1_6", time:"11:45", team1:"Utrecht Dragons", team2:"Bad Boyz Black",      s1:"", s2:"", soResult:null },
+    { id:"g1_7", time:"12:25", team1:"Stoczniowiec",          team2:"Neuchâtel",       s1:"", s2:"", soResult:null },
+    { id:"g1_8", time:"13:20", team1:"Falcons Grey",     team2:"Bad Boyz Black",      s1:"", s2:"", soResult:null },
   ]
 };
 
 const DAY1_G2 = {
-  teams: ["Crocodiles", "Bad Boyz 2", "Torun", "Sostines", "Stjernen", "CEHA"],
+  teams: ["Crocodiles", "Bad Boyz Orange", "Torun", "Sostines", "Stjernen", "CEHA"],
   games: [
-    { id:"g2_0", time:"14:00", team1:"Crocodiles", team2:"Bad Boyz 2", s1:"", s2:"", soResult:null },
+    { id:"g2_0", time:"14:00", team1:"Crocodiles", team2:"Bad Boyz Orange", s1:"", s2:"", soResult:null },
     { id:"g2_1", time:"14:55", team1:"Torun",      team2:"Sostines",   s1:"", s2:"", soResult:null },
     { id:"g2_2", time:"15:35", team1:"Stjernen",   team2:"CEHA",       s1:"", s2:"", soResult:null },
     { id:"g2_3", time:"16:30", team1:"Crocodiles", team2:"Sostines",   s1:"", s2:"", soResult:null },
-    { id:"g2_4", time:"17:10", team1:"Torun",      team2:"Bad Boyz 2", s1:"", s2:"", soResult:null },
+    { id:"g2_4", time:"17:10", team1:"Torun",      team2:"Bad Boyz Orange", s1:"", s2:"", soResult:null },
     { id:"g2_5", time:"18:05", team1:"Crocodiles", team2:"Stjernen",   s1:"", s2:"", soResult:null },
     { id:"g2_6", time:"18:45", team1:"Sostines",   team2:"CEHA",       s1:"", s2:"", soResult:null },
-    { id:"g2_7", time:"19:40", team1:"Bad Boyz 2", team2:"Stjernen",   s1:"", s2:"", soResult:null },
+    { id:"g2_7", time:"19:40", team1:"Bad Boyz Orange", team2:"Stjernen",   s1:"", s2:"", soResult:null },
     { id:"g2_8", time:"20:20", team1:"Torun",      team2:"CEHA",       s1:"", s2:"", soResult:null },
   ]
 };
