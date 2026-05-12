@@ -262,19 +262,21 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 
       {/* PIM row — shown once a result is entered */}
       {done && (
-        <div className="flex items-center gap-2 px-3 pb-2 -mt-1" style={{ opacity: locked ? 0.6 : 1 }}>
+        <div className="flex items-center gap-2 px-3 py-1.5" style={{ opacity: locked ? 0.6 : 1 }}>
           <span style={{ fontSize:9, color:"#3a5a8c", fontWeight:700, letterSpacing:"0.06em", minWidth:34 }}>PIM</span>
           <div className="flex items-center gap-1 flex-1 justify-end">
             <span style={{ fontSize:10, color:"#4a5a7c", textAlign:"right", flex:1 }} className="truncate">{game.team1}</span>
             <input type="number" min="0" value={game.pim1 ?? 0}
               className="score-input" disabled={locked}
               style={{ width:36, fontSize:12, ...(locked ? {cursor:"not-allowed", opacity:0.5} : {}) }}
+              onFocus={e => e.target.select()}
               onChange={e => onUpdate("pim1", Math.max(0, +e.target.value || 0))} />
           </div>
           <div className="flex items-center gap-1 flex-1">
             <input type="number" min="0" value={game.pim2 ?? 0}
               className="score-input" disabled={locked}
               style={{ width:36, fontSize:12, ...(locked ? {cursor:"not-allowed", opacity:0.5} : {}) }}
+              onFocus={e => e.target.select()}
               onChange={e => onUpdate("pim2", Math.max(0, +e.target.value || 0))} />
             <span style={{ fontSize:10, color:"#4a5a7c", flex:1 }} className="truncate">{game.team2}</span>
           </div>
