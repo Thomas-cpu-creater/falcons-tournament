@@ -325,7 +325,8 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true }) {
   const rows = calcStandings(teams, games, prevGames, swaps);
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border:"1px solid rgba(255,255,255,0.06)" }}>
+    <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+    <div className="rounded-lg overflow-hidden" style={{ border:"1px solid rgba(255,255,255,0.06)", minWidth:480 }}>
       <table className="w-full" style={{ fontSize:11, borderCollapse:"collapse" }}>
         <thead>
           <tr style={{ background:"rgba(0,0,0,0.3)", color:"#4a6a9c" }}>
@@ -392,6 +393,7 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
           })}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }
