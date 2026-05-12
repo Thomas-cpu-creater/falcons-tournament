@@ -104,7 +104,19 @@ function headToHead(teamA, teamB, games, prevGames = []) {
   return 0; // SO draw
 }
 
-function calcStandings(teams, games, prevGames = []) {
+// ─── Complete tie detection ──────────────────────────────────────
+function isCompletelyTied(a, b, games, prevGames) {
+  if (a.pts !== b.pts) return false;
+  if (headToHead(a.team, b.team, games, prevGames) !== 0) return false;
+  if ((a.gf - a.ga) !== (b.gf - b.ga)) return false;
+  if (a.gf !== b.gf) return false;
+  if (a.pim !== b.pim) return false;
+  return true;
+}
+
+const swapKey = (a, b) => [a, b].sort().join('|||');
+
+function calcStandings(teams, games, prevGames = [], swaps = {}) {
   const r = {};
   teams.forEach(t => r[t] = { team:t, pts:0, gp:0, w:0, otw:0, t:0, otl:0, l:0, gf:0, ga:0, pim:0 });
   games.filter(played).forEach(g => {
@@ -123,7 +135,7 @@ function calcStandings(teams, games, prevGames = []) {
       q.w++; q.pts += 3; p.l++;
     }
   });
-  return Object.values(r).sort((a, b) => {
+  const sorted = Object.values(r).sort((a, b) => {
     if (b.pts !== a.pts)                          return b.pts - a.pts;
     const h2h = headToHead(b.team, a.team, games, prevGames);
     if (h2h !== 0)                                return h2h;
@@ -133,6 +145,23 @@ function calcStandings(teams, games, prevGames = []) {
     if (a.pim !== b.pim)                           return a.pim - b.pim;
     return a.team.localeCompare(b.team, undefined, {numeric:true});
   });
+  // Apply manual coin-flip overrides for completely tied adjacent pairs (bubble until stable)
+  if (Object.keys(swaps).length > 0) {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < sorted.length - 1; i++) {
+        if (isCompletelyTied(sorted[i], sorted[i+1], games, prevGames)) {
+          const k = swapKey(sorted[i].team, sorted[i+1].team);
+          if (swaps[k] && swaps[k] !== sorted[i].team) {
+            [sorted[i], sorted[i+1]] = [sorted[i+1], sorted[i]];
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+  return sorted;
 }
 
 const makePlayoffGames = (seeds, pfx, times) => {
@@ -293,8 +322,8 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 }
 
 // ─── Standings Table ───────────────────────────────────────────
-function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [] }) {
-  const rows = calcStandings(teams, games, prevGames);
+function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true }) {
+  const rows = calcStandings(teams, games, prevGames, swaps);
   return (
     <div className="rounded-lg overflow-hidden" style={{ border:"1px solid rgba(255,255,255,0.06)" }}>
       <table className="w-full" style={{ fontSize:11, borderCollapse:"collapse" }}>
@@ -314,26 +343,51 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [] })
           {rows.map((s, i) => {
             const isTop = cutAt && i < cutAt;
             const isBot = cutAt && i >= cutAt;
+            const nextRow = rows[i + 1];
+            const tied = !locked && nextRow && isCompletelyTied(s, nextRow, games, prevGames);
+            const colSpan = 11 + (cutAt ? 1 : 0);
             return (
-              <tr key={s.team} style={{
-                borderBottom:"1px solid rgba(255,255,255,0.04)",
-                background: isTop ? "rgba(52,211,153,0.06)" : isBot ? "rgba(251,146,60,0.06)" : "transparent",
-              }}>
-                <td className="px-2 py-1.5" style={{ color:"#4a5a7c" }}>{i+1}</td>
-                <td className="px-2 py-1.5 font-medium truncate" style={{ maxWidth:90, color:"#c8d8f0" }}>{s.team}</td>
-                {[s.gp,s.w,s.otw,s.t,s.otl,s.l,s.gf,s.ga,s.pim].map((v, j) => (
-                  <td key={j} className="px-1 py-1.5 text-center"
-                    style={{ color: j===3 && v>0 ? "#fbbf24" : j===8 && v>0 ? "#f87171" : "#8aa0c8" }}>{v}</td>
-                ))}
-                <td className="px-2 py-1.5 text-center font-bold" style={{ color:"#7cb8ff", fontSize:13 }}>{s.pts}</td>
-                {cutAt && (
-                  <td className="px-2 py-1.5 text-center font-semibold" style={{
-                    fontSize:10, color: isTop ? "#34d399" : "#fb923c"
-                  }}>
-                    {isTop ? topTag : botTag}
-                  </td>
+              <>
+                <tr key={s.team} style={{
+                  borderBottom: tied ? "none" : "1px solid rgba(255,255,255,0.04)",
+                  background: isTop ? "rgba(52,211,153,0.06)" : isBot ? "rgba(251,146,60,0.06)" : "transparent",
+                }}>
+                  <td className="px-2 py-1.5" style={{ color:"#4a5a7c" }}>{i+1}</td>
+                  <td className="px-2 py-1.5 font-medium truncate" style={{ maxWidth:90, color:"#c8d8f0" }}>{s.team}</td>
+                  {[s.gp,s.w,s.otw,s.t,s.otl,s.l,s.gf,s.ga,s.pim].map((v, j) => (
+                    <td key={j} className="px-1 py-1.5 text-center"
+                      style={{ color: j===3 && v>0 ? "#fbbf24" : j===8 && v>0 ? "#f87171" : "#8aa0c8" }}>{v}</td>
+                  ))}
+                  <td className="px-2 py-1.5 text-center font-bold" style={{ color:"#7cb8ff", fontSize:13 }}>{s.pts}</td>
+                  {cutAt && (
+                    <td className="px-2 py-1.5 text-center font-semibold" style={{
+                      fontSize:10, color: isTop ? "#34d399" : "#fb923c"
+                    }}>
+                      {isTop ? topTag : botTag}
+                    </td>
+                  )}
+                </tr>
+                {tied && (
+                  <tr key={`tie-${s.team}`} style={{ background:"rgba(251,191,36,0.05)" }}>
+                    <td colSpan={colSpan} style={{ padding:"3px 8px", textAlign:"center" }}>
+                      <button
+                        onClick={() => {
+                          const k = swapKey(s.team, nextRow.team);
+                          const cur = swaps[k];
+                          onSwap(k, cur === s.team ? nextRow.team : s.team);
+                        }}
+                        style={{
+                          background:"rgba(251,191,36,0.12)", border:"1px solid rgba(251,191,36,0.3)",
+                          borderRadius:6, padding:"2px 10px", cursor:"pointer",
+                          color:"#fbbf24", fontSize:9, fontWeight:700, letterSpacing:"0.06em",
+                          fontFamily:"'DM Sans', sans-serif",
+                        }}>
+                        🪙 EQUAL — TAP TO SWAP ORDER
+                      </button>
+                    </td>
+                  </tr>
                 )}
-              </tr>
+              </>
             );
           })}
         </tbody>
@@ -343,7 +397,7 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [] })
 }
 
 // ─── Group Panel ──────────────────────────────────────────────
-function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [] }) {
+function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [], swaps = {}, onSwap }) {
   const upd      = (i, f, v) => onGamesChange(games.map((g, j) => j===i ? {...g,[f]:v} : g));
   const doneCount = games.filter(played).length;
   const canDrag   = !!reorderable;
@@ -469,7 +523,7 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
           </div>
         ))}
         <p className="uppercase tracking-widest mb-2 mt-5" style={{ fontSize:9, color:"#3a5a8c", fontWeight:700 }}>Standings</p>
-        <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} prevGames={prevGames} />
+        <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} prevGames={prevGames} swaps={swaps} onSwap={onSwap} locked={locked} />
         <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:4 }}>
           <p style={{ fontSize:10, color:"#3a5a8c" }}>
             <strong style={{ color:"#4a6a9c" }}>Points:</strong> Win 3 · OT/SO Win 2 · OT/SO Loss 1 · SO Draw 1 · Loss 0
@@ -613,6 +667,14 @@ export default function HockeyTournament() {
   const [day2OrderA, setDay2OrderA] = useState([0,1,2,3,4,5,6,7,8]);
   const [day2OrderB, setDay2OrderB] = useState([0,1,2,3,4,5,6,7,8]);
 
+  // Coin-flip manual overrides for completely tied teams (per group)
+  const [swaps1, setSwaps1] = useState({});
+  const [swaps2, setSwaps2] = useState({});
+  const [swapsA, setSwapsA] = useState({});
+  const [swapsB, setSwapsB] = useState({});
+  const makeSwapHandler = (setter) => (key, winner) =>
+    setter(prev => ({ ...prev, [key]: winner }));
+
   // ── Auth state ──────────────────────────────────────────────
   const [locked, setLocked]       = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -640,6 +702,7 @@ export default function HockeyTournament() {
     setG2({ ...DAY1_G2, games: DAY1_G2.games.map(clearGame) });
     [setGA, setGB].forEach(set => set(p => ({ ...p, games: p.games.map(clearGame) })));
     [setPA, setPB, setPC].forEach(set => set(p => ({ ...p, games: p.games.map(clearPlayoffGame) })));
+    setSwaps1({}); setSwaps2({}); setSwapsA({}); setSwapsB({});
     setShowResetModal(false);
     setResetInput("");
   };
@@ -682,6 +745,10 @@ export default function HockeyTournament() {
         if (s.pC)         setPC(s.pC);
         if (s.day2OrderA) setDay2OrderA(s.day2OrderA);
         if (s.day2OrderB) setDay2OrderB(s.day2OrderB);
+        if (s.swaps1)     setSwaps1(s.swaps1);
+        if (s.swaps2)     setSwaps2(s.swaps2);
+        if (s.swapsA)     setSwapsA(s.swapsA);
+        if (s.swapsB)     setSwapsB(s.swapsB);
       }
       setInitialized(true);
     });
@@ -693,9 +760,10 @@ export default function HockeyTournament() {
     if (!initialized) return;
     suppressUpdate.current = true;
     set(ref(db, 'tournament'), {
-      g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB
+      g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB,
+      swaps1, swaps2, swapsA, swapsB
     }).catch(console.error);
-  }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB]); // eslint-disable-line
+  }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB]); // eslint-disable-line
 
   // ── Phase helpers ────────────────────────────────────────────
   const phaseEnabled = {
@@ -705,11 +773,12 @@ export default function HockeyTournament() {
   };
 
   const goDay2 = () => {
-    const [s1, s2] = [calcStandings(g1.teams, g1.games), calcStandings(g2.teams, g2.games)];
-    // tA = [M1,M2,M3, A1,A2,A3], tB = [M4,M5,M6, A4,A5,A6]
+    const [s1, s2] = [
+      calcStandings(g1.teams, g1.games, [], swaps1),
+      calcStandings(g2.teams, g2.games, [], swaps2),
+    ];
     const tA = [...s1.slice(0,3), ...s2.slice(0,3)].map(s => s.team);
     const tB = [...s1.slice(3),   ...s2.slice(3)  ].map(s => s.team);
-    // Use stored custom schedule orders (pre-arranged in projection view)
     setGA({ teams:tA, games:buildDay2GamesFromOrder(tA, DAY2_GRUPP_A_SCHED, day2OrderA, "gA_") });
     setGB({ teams:tB, games:buildDay2GamesFromOrder(tB, DAY2_GRUPP_B_SCHED, day2OrderB, "gB_") });
     setPhase("day2");
@@ -718,8 +787,8 @@ export default function HockeyTournament() {
   const goDay3 = () => {
     const d1Games = [...g1.games, ...g2.games];
     const [sA, sB] = [
-      calcStandings(gA.teams, gA.games, d1Games),
-      calcStandings(gB.teams, gB.games, d1Games),
+      calcStandings(gA.teams, gA.games, d1Games, swapsA),
+      calcStandings(gB.teams, gB.games, d1Games, swapsB),
     ];
     const tA = sA.slice(0,4).map(s => s.team);
     const tB = [...sA.slice(4), ...sB.slice(0,2)].map(s => s.team);
@@ -999,11 +1068,13 @@ export default function HockeyTournament() {
               <GroupPanel title="Friday · Group 1" accent="linear-gradient(135deg,#1d4ed8,#3b82f6)"
                 teams={g1.teams} games={g1.games}
                 onGamesChange={games => setG1(p => ({...p,games}))}
-                cutAt={3} topTag="→ Grp A" botTag="→ Grp B" locked={locked} />
+                cutAt={3} topTag="→ Grp A" botTag="→ Grp B" locked={locked}
+                swaps={swaps1} onSwap={makeSwapHandler(setSwaps1)} />
               <GroupPanel title="Friday · Group 2" accent="linear-gradient(135deg,#6d28d9,#8b5cf6)"
                 teams={g2.teams} games={g2.games}
                 onGamesChange={games => setG2(p => ({...p,games}))}
-                cutAt={3} topTag="→ Grp A" botTag="→ Grp B" locked={locked} />
+                cutAt={3} topTag="→ Grp A" botTag="→ Grp B" locked={locked}
+                swaps={swaps2} onSwap={makeSwapHandler(setSwaps2)} />
             </div>
             <button className="advance-btn" onClick={goDay2} disabled={!d1Ready || locked}>
               {locked ? "🔒 Unlock to advance" : d1Ready ? "Advance to Day 2 →" : `${countPlayed(g1.games, g2.games)}/18 games played — enter all results to advance`}
@@ -1060,13 +1131,15 @@ export default function HockeyTournament() {
                       games={buildDay2GamesFromOrder(projB, DAY2_GRUPP_B_SCHED, day2OrderB, "projB_")}
                       onGamesChange={newGames => setDay2OrderB(recoverOrder(newGames, "projB_"))}
                       cutAt={2} topTag="Ply B" botTag="Ply C"
-                      locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]} />
+                      locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} />
                     <GroupPanel title="Saturday · Group A (projected)" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={projA}
                       games={buildDay2GamesFromOrder(projA, DAY2_GRUPP_A_SCHED, day2OrderA, "projA_")}
                       onGamesChange={newGames => setDay2OrderA(recoverOrder(newGames, "projA_"))}
                       cutAt={4} topTag="Ply A" botTag="Ply B"
-                      locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]} />
+                      locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} />
                   </>
                 ) : (
                   <>
@@ -1074,12 +1147,14 @@ export default function HockeyTournament() {
                       teams={gB.teams} games={gB.games}
                       onGamesChange={games => setGB(p => ({...p,games}))}
                       cutAt={2} topTag="Ply B" botTag="Ply C" locked={locked} reorderable={!locked}
-                      prevGames={[...g1.games, ...g2.games]} />
+                      prevGames={[...g1.games, ...g2.games]}
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} />
                     <GroupPanel title="Saturday · Group A" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={gA.teams} games={gA.games}
                       onGamesChange={games => setGA(p => ({...p,games}))}
                       cutAt={4} topTag="Ply A" botTag="Ply B" locked={locked} reorderable={!locked}
-                      prevGames={[...g1.games, ...g2.games]} />
+                      prevGames={[...g1.games, ...g2.games]}
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} />
                   </>
                 )}
               </div>
@@ -1105,8 +1180,8 @@ export default function HockeyTournament() {
           const projA_games = gA.games.length > 0 ? gA.games : [];
           const projB_games = gB.games.length > 0 ? gB.games : [];
           const d1Games    = [...g1.games, ...g2.games];
-          const sA = calcStandings(projA_teams, projA_games, d1Games);
-          const sB = calcStandings(projB_teams, projB_games, d1Games);
+          const sA = calcStandings(projA_teams, projA_games, d1Games, swapsA);
+          const sB = calcStandings(projB_teams, projB_games, d1Games, swapsB);
           const projPA = sA.slice(0,4).map(s => s.team);
           const projPB = [...sA.slice(4), ...sB.slice(0,2)].map(s => s.team);
           const projPC = sB.slice(2).map(s => s.team);
