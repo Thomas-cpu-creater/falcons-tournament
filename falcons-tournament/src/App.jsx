@@ -280,6 +280,8 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
           </div>
         </div>
       )}
+
+      {playoffDrawWarning && (
         <p style={{ textAlign:"center", marginTop:4, fontSize:10, color:"#f87171" }}>
           ⚠ SO ties not allowed in playoffs — pick a winner
         </p>
