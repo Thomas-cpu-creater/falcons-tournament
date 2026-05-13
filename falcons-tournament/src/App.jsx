@@ -90,16 +90,16 @@ const loser = g => {
 // ─── Standings engine ────────────────────────────────────────────
 const swapKey = (a, b) => [a, b].sort().join('|||');
 
-// Build mini-stats for a set of teams using only games played between them
+// Build mini-stats using only games between teams in this group
 function miniStats(group, allGames) {
   const teamSet = new Set(group.map(s => s.team));
-  const mini = {};
-  group.forEach(s => mini[s.team] = { pts:0, gf:0, ga:0 });
+  const m = {};
+  group.forEach(s => m[s.team] = { pts:0, gf:0, ga:0 });
   allGames.filter(g =>
     played(g) && teamSet.has(g.team1) && teamSet.has(g.team2)
   ).forEach(g => {
     const [a, b] = [+g.s1, +g.s2];
-    const p = mini[g.team1], q = mini[g.team2];
+    const p = m[g.team1], q = m[g.team2];
     p.gf += a; p.ga += b; q.gf += b; q.ga += a;
     if (a === b) {
       if (g.soResult === "tie")        { p.pts++;    q.pts++;    }
@@ -108,36 +108,23 @@ function miniStats(group, allGames) {
     } else if (a > b) { p.pts += 3; }
     else              { q.pts += 3; }
   });
-  return mini;
+  return m;
 }
 
-// Resolve a group of teams tied on overall points
-// Returns the sorted group with _tiedWithNext flag set on pairs that need coin flip
-function resolveGroup(group, allGames, swaps) {
-  if (group.length === 1) return group;
-  const m = miniStats(group, allGames);
-
+// Final fallback when all h2h tiebreakers exhausted — overall GD, GF, PIM, coin flip
+function resolveByOverall(group, m, swaps) {
   const sorted = [...group].sort((a, b) => {
     const ma = m[a.team], mb = m[b.team];
-    // 1. Internal (h2h) points
-    if (mb.pts !== ma.pts)                          return mb.pts - ma.pts;
-    // 2. Internal goal difference
     const igd = (mb.gf-mb.ga) - (ma.gf-ma.ga);
-    if (igd !== 0)                                  return igd;
-    // 3. Internal goals scored
-    if (mb.gf !== ma.gf)                            return mb.gf - ma.gf;
-    // 4. Overall goal difference
+    if (igd !== 0)       return igd;
+    if (mb.gf !== ma.gf) return mb.gf - ma.gf;
     const gd = (b.gf-b.ga) - (a.gf-a.ga);
-    if (gd !== 0)                                   return gd;
-    // 5. Overall goals scored
-    if (b.gf !== a.gf)                              return b.gf - a.gf;
-    // 6. Fewest penalty minutes
-    if (a.pim !== b.pim)                            return a.pim - b.pim;
-    // 7. Alphabetical safety net
+    if (gd !== 0)        return gd;
+    if (b.gf !== a.gf)   return b.gf - a.gf;
+    if (a.pim !== b.pim) return a.pim - b.pim;
     return a.team.localeCompare(b.team, undefined, {numeric:true});
   });
-
-  // Apply coin-flip swaps (bubble until stable)
+  // Apply coin-flip swaps for completely tied adjacent pairs
   if (Object.keys(swaps).length > 0) {
     let changed = true;
     while (changed) {
@@ -146,12 +133,8 @@ function resolveGroup(group, allGames, swaps) {
         const ka = sorted[i], kb = sorted[i+1];
         const ma2 = m[ka.team], mb2 = m[kb.team];
         const fullyTied =
-          ma2.pts === mb2.pts &&
-          (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) &&
-          ma2.gf === mb2.gf &&
-          (ka.gf-ka.ga) === (kb.gf-kb.ga) &&
-          ka.gf === kb.gf &&
-          ka.pim === kb.pim;
+          ma2.pts === mb2.pts && (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) && ma2.gf === mb2.gf &&
+          (ka.gf-ka.ga) === (kb.gf-kb.ga) && ka.gf === kb.gf && ka.pim === kb.pim;
         if (fullyTied) {
           const k = swapKey(ka.team, kb.team);
           if (swaps[k] && swaps[k] !== ka.team) {
@@ -162,21 +145,44 @@ function resolveGroup(group, allGames, swaps) {
       }
     }
   }
-
-  // Mark adjacent pairs that are still completely tied (need coin flip)
+  // Mark adjacent pairs still completely tied (show coin flip button)
   for (let i = 0; i < sorted.length - 1; i++) {
     const ka = sorted[i], kb = sorted[i+1];
     const ma2 = m[ka.team], mb2 = m[kb.team];
     sorted[i]._tiedWithNext =
-      ma2.pts === mb2.pts &&
-      (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) &&
-      ma2.gf === mb2.gf &&
-      (ka.gf-ka.ga) === (kb.gf-kb.ga) &&
-      ka.gf === kb.gf &&
-      ka.pim === kb.pim;
+      ma2.pts === mb2.pts && (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) && ma2.gf === mb2.gf &&
+      (ka.gf-ka.ga) === (kb.gf-kb.ga) && ka.gf === kb.gf && ka.pim === kb.pim;
   }
-
   return sorted;
+}
+
+// Recursively resolve a tied group:
+// 1. Compute internal (h2h) points using only games between teams in this group
+// 2. If a sub-group emerges with fewer teams, recurse into it (using only their games)
+// 3. If all teams still tied on internal points, fall back to overall tiebreakers
+function resolveGroup(group, allGames, swaps) {
+  if (group.length === 1) return group;
+  const m = miniStats(group, allGames);
+  const byInternalPts = [...group].sort((a, b) => m[b.team].pts - m[a.team].pts);
+  const result = [];
+  let i = 0;
+  while (i < byInternalPts.length) {
+    let j = i + 1;
+    while (j < byInternalPts.length &&
+           m[byInternalPts[j].team].pts === m[byInternalPts[i].team].pts) j++;
+    const sub = byInternalPts.slice(i, j);
+    if (sub.length === 1) {
+      result.push(sub[0]);
+    } else if (sub.length < group.length) {
+      // Sub-group is smaller — recurse using only games between sub-group teams
+      result.push(...resolveGroup(sub, allGames, swaps));
+    } else {
+      // All teams still tied on internal pts — fall to overall tiebreakers
+      result.push(...resolveByOverall(sub, m, swaps));
+    }
+    i = j;
+  }
+  return result;
 }
 
 function calcStandings(teams, games, prevGames = [], swaps = {}) {
@@ -195,10 +201,8 @@ function calcStandings(teams, games, prevGames = [], swaps = {}) {
     } else if (a > b) { p.w++; p.pts += 3; q.l++; }
     else              { q.w++; q.pts += 3; p.l++; }
   });
-
-  // Sort by overall points, then resolve tied groups with sub-standings
-  const byPts = Object.values(r).sort((a, b) => b.pts - a.pts);
   const allGames = [...games, ...prevGames];
+  const byPts = Object.values(r).sort((a, b) => b.pts - a.pts);
   const result = [];
   let i = 0;
   while (i < byPts.length) {
@@ -393,7 +397,6 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
           {rows.map((s, i) => {
             const isTop = cutAt && i < cutAt;
             const isBot = cutAt && i >= cutAt;
-            const nextRow = rows[i + 1]; // kept for colSpan reference
             const tied = !locked && s._tiedWithNext;
             const colSpan = 11 + (cutAt ? 1 : 0);
             return (
