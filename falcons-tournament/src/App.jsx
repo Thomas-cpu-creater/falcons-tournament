@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "./firebase.js";
 import { ref, set, onValue } from "firebase/database";
 
-const PASSWORD = "FalconsU12";
+const PASSWORD       = "FalconsU12";
+const RESET_PASSWORD = "Thomas";
 
 // ─── Hardcoded Day 1 schedule ───────────────────────────────────
 const DAY1_G1 = {
@@ -323,7 +324,10 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 
 // ─── Standings Table ───────────────────────────────────────────
 function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true }) {
-  const rows = calcStandings(teams, games, prevGames, swaps);
+  const rows = useMemo(
+    () => calcStandings(teams, games, prevGames, swaps),
+    [teams, games, prevGames, swaps] // eslint-disable-line
+  );
   return (
     <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
     <div className="rounded-lg overflow-hidden" style={{ border:"1px solid rgba(255,255,255,0.06)", minWidth:480 }}>
@@ -589,33 +593,6 @@ function PlayoffPanel({ title, accent, data, onDataChange, locked }) {
   );
 }
 
-// ─── Projection Panel (read-only team list with cut indicator) ─
-function ProjectionPanel({ title, accent, teams, cutAt, topTag, botTag }) {
-  return (
-    <div className="rounded-2xl overflow-hidden" style={{ background:"#0d1b2e", border:"1px solid rgba(251,191,36,0.15)" }}>
-      <div className="px-4 py-3 flex items-center justify-between" style={{ background: accent, opacity:0.85 }}>
-        <span className="font-bold text-white" style={{ fontSize:14 }}>{title}</span>
-        <span style={{ fontSize:10, color:"rgba(255,255,255,0.7)", fontWeight:600, letterSpacing:"0.08em" }}>PROJECTED</span>
-      </div>
-      <div className="p-4">
-        {teams.map((t, i) => (
-          <div key={t} className="flex items-center gap-3 px-3 py-2 rounded-lg mb-1.5"
-            style={{
-              background: i < cutAt ? "rgba(52,211,153,0.06)" : "rgba(251,146,60,0.06)",
-              border: "1px solid " + (i < cutAt ? "rgba(52,211,153,0.12)" : "rgba(251,146,60,0.12)"),
-            }}>
-            <span style={{ fontSize:11, color:"#4a5a7c", width:16 }}>{i+1}</span>
-            <span style={{ flex:1, fontSize:13, fontWeight:600, color:"#c8d8f0" }}>{t}</span>
-            <span style={{ fontSize:10, fontWeight:700, color: i < cutAt ? "#34d399" : "#fb923c" }}>
-              {i < cutAt ? topTag : botTag}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Playoff Projection Panel (shows seedings + times, no score entry) ─
 function PlayoffProjectionPanel({ title, accent, teams, times }) {
   const [s1, s2, s3, s4] = teams;
@@ -757,14 +734,19 @@ export default function HockeyTournament() {
     return unsub; // cleanup listener on unmount
   }, []);
 
-  // Save to Firebase whenever state changes (after first load)
+  // Save to Firebase whenever state changes (after first load) — debounced 800ms
+  const saveTimer = useRef(null);
   useEffect(() => {
     if (!initialized) return;
-    suppressUpdate.current = true;
-    set(ref(db, 'tournament'), {
-      g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB,
-      swaps1, swaps2, swapsA, swapsB
-    }).catch(console.error);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      suppressUpdate.current = true;
+      set(ref(db, 'tournament'), {
+        g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB,
+        swaps1, swaps2, swapsA, swapsB
+      }).catch(console.error);
+    }, 800);
+    return () => clearTimeout(saveTimer.current);
   }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB]); // eslint-disable-line
 
   // ── Phase helpers ────────────────────────────────────────────
@@ -901,19 +883,22 @@ export default function HockeyTournament() {
               </p>
             </div>
             <p style={{ fontSize:12, color:"#4a6a9c", marginBottom:8, textAlign:"center" }}>
-              Type <strong style={{ color:"#f87171", letterSpacing:"0.05em" }}>RESET</strong> to confirm
+              Enter the reset password to confirm
             </p>
             <input
-              className="pw-input"
-              type="text"
-              placeholder="RESET"
+              className={`pw-input${pwError ? " error" : ""}`}
+              type="password"
+              placeholder="Password"
               value={resetInput}
               autoFocus
-              style={{ textAlign:"center", letterSpacing:"0.15em", textTransform:"uppercase",
-                borderColor: resetInput && resetInput.toUpperCase() !== "RESET" ? "rgba(248,113,113,0.4)" : undefined }}
-              onChange={e => setResetInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && resetInput.toUpperCase() === "RESET" && clearAllScores()}
+              onChange={e => { setResetInput(e.target.value); }}
+              onKeyDown={e => e.key === "Enter" && resetInput === RESET_PASSWORD && clearAllScores()}
             />
+            {resetInput.length > 0 && resetInput !== RESET_PASSWORD && (
+              <p style={{ color:"#f87171", fontSize:12, marginTop:8, textAlign:"center" }}>
+                Incorrect password
+              </p>
+            )}
             <div style={{ display:"flex", gap:10, marginTop:16 }}>
               <button onClick={() => { setShowResetModal(false); setResetInput(""); }}
                 style={{
@@ -922,14 +907,14 @@ export default function HockeyTournament() {
                   cursor:"pointer", fontFamily:"'DM Sans', sans-serif",
                 }}>Cancel</button>
               <button onClick={clearAllScores}
-                disabled={resetInput.toUpperCase() !== "RESET"}
+                disabled={resetInput !== RESET_PASSWORD}
                 style={{
                   flex:2, padding:"11px 0", borderRadius:10, border:"none",
-                  background: resetInput.toUpperCase() === "RESET"
+                  background: resetInput === RESET_PASSWORD
                     ? "linear-gradient(135deg,#dc2626,#b91c1c)" : "rgba(255,255,255,0.05)",
-                  color: resetInput.toUpperCase() === "RESET" ? "white" : "#3a4a6a",
+                  color: resetInput === RESET_PASSWORD ? "white" : "#3a4a6a",
                   fontSize:14, fontWeight:700,
-                  cursor: resetInput.toUpperCase() === "RESET" ? "pointer" : "not-allowed",
+                  cursor: resetInput === RESET_PASSWORD ? "pointer" : "not-allowed",
                   fontFamily:"'DM Sans', sans-serif", transition:"all 0.15s",
                 }}>Clear All Scores</button>
             </div>
