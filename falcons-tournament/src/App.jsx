@@ -87,35 +87,97 @@ const loser = g => {
   return null;
 };
 
-// ─── Head-to-head tiebreaker ────────────────────────────────────
-// Returns +1 if teamA beat teamB, -1 if teamB beat teamA, 0 if not played / draw
-// prevGames is an optional fallback (e.g. Day 1 games) used only if no current-group result exists
-function headToHead(teamA, teamB, games, prevGames = []) {
-  const find = (arr) => arr.find(g =>
-    played(g) && (
-      (g.team1 === teamA && g.team2 === teamB) ||
-      (g.team1 === teamB && g.team2 === teamA)
-    )
-  );
-  const g = find(games) || find(prevGames);
-  if (!g) return 0;
-  const w = winner(g);
-  if (w === teamA) return 1;
-  if (w === teamB) return -1;
-  return 0; // SO draw
-}
-
-// ─── Complete tie detection ──────────────────────────────────────
-function isCompletelyTied(a, b, games, prevGames) {
-  if (a.pts !== b.pts) return false;
-  if (headToHead(a.team, b.team, games, prevGames) !== 0) return false;
-  if ((a.gf - a.ga) !== (b.gf - b.ga)) return false;
-  if (a.gf !== b.gf) return false;
-  if (a.pim !== b.pim) return false;
-  return true;
-}
-
+// ─── Standings engine ────────────────────────────────────────────
 const swapKey = (a, b) => [a, b].sort().join('|||');
+
+// Build mini-stats for a set of teams using only games played between them
+function miniStats(group, allGames) {
+  const teamSet = new Set(group.map(s => s.team));
+  const mini = {};
+  group.forEach(s => mini[s.team] = { pts:0, gf:0, ga:0 });
+  allGames.filter(g =>
+    played(g) && teamSet.has(g.team1) && teamSet.has(g.team2)
+  ).forEach(g => {
+    const [a, b] = [+g.s1, +g.s2];
+    const p = mini[g.team1], q = mini[g.team2];
+    p.gf += a; p.ga += b; q.gf += b; q.ga += a;
+    if (a === b) {
+      if (g.soResult === "tie")        { p.pts++;    q.pts++;    }
+      else if (g.soResult === "team1") { p.pts += 2; q.pts++;    }
+      else if (g.soResult === "team2") { q.pts += 2; p.pts++;    }
+    } else if (a > b) { p.pts += 3; }
+    else              { q.pts += 3; }
+  });
+  return mini;
+}
+
+// Resolve a group of teams tied on overall points
+// Returns the sorted group with _tiedWithNext flag set on pairs that need coin flip
+function resolveGroup(group, allGames, swaps) {
+  if (group.length === 1) return group;
+  const m = miniStats(group, allGames);
+
+  const sorted = [...group].sort((a, b) => {
+    const ma = m[a.team], mb = m[b.team];
+    // 1. Internal (h2h) points
+    if (mb.pts !== ma.pts)                          return mb.pts - ma.pts;
+    // 2. Internal goal difference
+    const igd = (mb.gf-mb.ga) - (ma.gf-ma.ga);
+    if (igd !== 0)                                  return igd;
+    // 3. Internal goals scored
+    if (mb.gf !== ma.gf)                            return mb.gf - ma.gf;
+    // 4. Overall goal difference
+    const gd = (b.gf-b.ga) - (a.gf-a.ga);
+    if (gd !== 0)                                   return gd;
+    // 5. Overall goals scored
+    if (b.gf !== a.gf)                              return b.gf - a.gf;
+    // 6. Fewest penalty minutes
+    if (a.pim !== b.pim)                            return a.pim - b.pim;
+    // 7. Alphabetical safety net
+    return a.team.localeCompare(b.team, undefined, {numeric:true});
+  });
+
+  // Apply coin-flip swaps (bubble until stable)
+  if (Object.keys(swaps).length > 0) {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const ka = sorted[i], kb = sorted[i+1];
+        const ma2 = m[ka.team], mb2 = m[kb.team];
+        const fullyTied =
+          ma2.pts === mb2.pts &&
+          (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) &&
+          ma2.gf === mb2.gf &&
+          (ka.gf-ka.ga) === (kb.gf-kb.ga) &&
+          ka.gf === kb.gf &&
+          ka.pim === kb.pim;
+        if (fullyTied) {
+          const k = swapKey(ka.team, kb.team);
+          if (swaps[k] && swaps[k] !== ka.team) {
+            sorted.splice(i, 2, kb, ka);
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Mark adjacent pairs that are still completely tied (need coin flip)
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const ka = sorted[i], kb = sorted[i+1];
+    const ma2 = m[ka.team], mb2 = m[kb.team];
+    sorted[i]._tiedWithNext =
+      ma2.pts === mb2.pts &&
+      (ma2.gf-ma2.ga) === (mb2.gf-mb2.ga) &&
+      ma2.gf === mb2.gf &&
+      (ka.gf-ka.ga) === (kb.gf-kb.ga) &&
+      ka.gf === kb.gf &&
+      ka.pim === kb.pim;
+  }
+
+  return sorted;
+}
 
 function calcStandings(teams, games, prevGames = [], swaps = {}) {
   const r = {};
@@ -130,39 +192,22 @@ function calcStandings(teams, games, prevGames = [], swaps = {}) {
       if (g.soResult === "tie")        { p.t++;   p.pts++;    q.t++;   q.pts++;    }
       else if (g.soResult === "team1") { p.otw++; p.pts += 2; q.otl++; q.pts++;   }
       else if (g.soResult === "team2") { q.otw++; q.pts += 2; p.otl++; p.pts++;   }
-    } else if (a > b) {
-      p.w++; p.pts += 3; q.l++;
-    } else {
-      q.w++; q.pts += 3; p.l++;
-    }
+    } else if (a > b) { p.w++; p.pts += 3; q.l++; }
+    else              { q.w++; q.pts += 3; p.l++; }
   });
-  const sorted = Object.values(r).sort((a, b) => {
-    if (b.pts !== a.pts)                          return b.pts - a.pts;
-    const h2h = headToHead(b.team, a.team, games, prevGames);
-    if (h2h !== 0)                                return h2h;
-    const gdDiff = (b.gf - b.ga) - (a.gf - a.ga);
-    if (gdDiff !== 0)                             return gdDiff;
-    if (b.gf !== a.gf)                            return b.gf - a.gf;
-    if (a.pim !== b.pim)                           return a.pim - b.pim;
-    return a.team.localeCompare(b.team, undefined, {numeric:true});
-  });
-  // Apply manual coin-flip overrides for completely tied adjacent pairs (bubble until stable)
-  if (Object.keys(swaps).length > 0) {
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let i = 0; i < sorted.length - 1; i++) {
-        if (isCompletelyTied(sorted[i], sorted[i+1], games, prevGames)) {
-          const k = swapKey(sorted[i].team, sorted[i+1].team);
-          if (swaps[k] && swaps[k] !== sorted[i].team) {
-            [sorted[i], sorted[i+1]] = [sorted[i+1], sorted[i]];
-            changed = true;
-          }
-        }
-      }
-    }
+
+  // Sort by overall points, then resolve tied groups with sub-standings
+  const byPts = Object.values(r).sort((a, b) => b.pts - a.pts);
+  const allGames = [...games, ...prevGames];
+  const result = [];
+  let i = 0;
+  while (i < byPts.length) {
+    let j = i + 1;
+    while (j < byPts.length && byPts[j].pts === byPts[i].pts) j++;
+    result.push(...resolveGroup(byPts.slice(i, j), allGames, swaps));
+    i = j;
   }
-  return sorted;
+  return result;
 }
 
 const makePlayoffGames = (seeds, pfx, times) => {
@@ -348,8 +393,8 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
           {rows.map((s, i) => {
             const isTop = cutAt && i < cutAt;
             const isBot = cutAt && i >= cutAt;
-            const nextRow = rows[i + 1];
-            const tied = !locked && nextRow && isCompletelyTied(s, nextRow, games, prevGames);
+            const nextRow = rows[i + 1]; // kept for colSpan reference
+            const tied = !locked && s._tiedWithNext;
             const colSpan = 11 + (cutAt ? 1 : 0);
             return (
               <>
