@@ -478,7 +478,7 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
 }
 
 // ─── Group Panel ──────────────────────────────────────────────
-function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [], swaps = {}, onSwap, bonuses = {} }) {
+function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [], swaps = {}, onSwap, bonuses = {}, showBonusLegend = false }) {
   const upd      = (i, f, v) => onGamesChange(games.map((g, j) => j===i ? {...g,[f]:v} : g));
   const doneCount = games.filter(played).length;
   const canDrag   = !!reorderable;
@@ -604,7 +604,7 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
           </div>
         ))}
         <p className="uppercase tracking-widest mb-2 mt-5" style={{ fontSize:9, color:"#3a5a8c", fontWeight:700 }}>Standings</p>
-        {Object.keys(bonuses).length > 0 && (
+        {(showBonusLegend || Object.keys(bonuses).length > 0) && (
           <div className="rounded-lg" style={{
             background:"rgba(52,211,153,0.05)", border:"1px solid rgba(52,211,153,0.15)",
             padding:"8px 12px", marginBottom:8, fontSize:11, color:"#8aaad8", lineHeight:1.6
@@ -1369,29 +1369,29 @@ export default function HockeyTournament() {
                       onGamesChange={newGames => setDay2OrderB(recoverOrder(newGames, "projB_"))}
                       cutAt={2} topTag="Ply B" botTag="Ply C"
                       locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} />
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} showBonusLegend={true} />
                     <GroupPanel title="Saturday · Group A (projected)" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={projA}
                       games={buildDay2GamesFromOrder(projA, DAY2_GRUPP_A_SCHED, day2OrderA, "projA_")}
                       onGamesChange={newGames => setDay2OrderA(recoverOrder(newGames, "projA_"))}
                       cutAt={4} topTag="Ply A" botTag="Ply B"
                       locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} />
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} showBonusLegend={true} />
                   </>
                 ) : (
                   <>
                     <GroupPanel title="Saturday · Group B" accent="linear-gradient(135deg,#7f1d1d,#b91c1c)"
                       teams={gB.teams} games={gB.games}
                       onGamesChange={games => setGB(p => ({...p,games}))}
-                      cutAt={2} topTag="Ply B" botTag="Ply C" locked={locked} reorderable={!locked}
+                      cutAt={2} topTag="Ply B" botTag="Ply C" locked={locked || !d1Ready} reorderable={!locked && d1Ready}
                       prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} />
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} showBonusLegend={true} />
                     <GroupPanel title="Saturday · Group A" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={gA.teams} games={gA.games}
                       onGamesChange={games => setGA(p => ({...p,games}))}
-                      cutAt={4} topTag="Ply A" botTag="Ply B" locked={locked} reorderable={!locked}
+                      cutAt={4} topTag="Ply A" botTag="Ply B" locked={locked || !d1Ready} reorderable={!locked && d1Ready}
                       prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} />
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} showBonusLegend={true} />
                   </>
                 )}
               </div>
@@ -1459,13 +1459,13 @@ export default function HockeyTournament() {
                   <>
                     <PlayoffPanel title="🎖 Playoff C — Sunday 07:00"
                       accent="linear-gradient(135deg,#7c2d12,#c2410c)"
-                      data={pC} onDataChange={setPC} locked={locked} />
+                      data={pC} onDataChange={setPC} locked={locked || !d2Ready} />
                     <PlayoffPanel title="🥈 Playoff B — Sunday 08:35"
                       accent="linear-gradient(135deg,#374151,#6b7280)"
-                      data={pB} onDataChange={setPB} locked={locked} />
+                      data={pB} onDataChange={setPB} locked={locked || !d2Ready} />
                     <PlayoffPanel title="🏆 Playoff A — Sunday 10:10"
                       accent="linear-gradient(135deg,#b45309,#d97706)"
-                      data={pA} onDataChange={setPA} locked={locked} />
+                      data={pA} onDataChange={setPA} locked={locked || !d2Ready} />
                   </>
                 )}
               </div>
