@@ -425,7 +425,13 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
                   <td className="px-2 py-1.5 text-center font-bold" style={{ color:"#7cb8ff", fontSize:13 }}>{s.pts}</td>
                   {cutAt && (
                     <td className="px-2 py-1.5 text-center font-semibold" style={{
-                      fontSize:10, color: isTop ? "#34d399" : "#fb923c"
+                      fontSize:10,
+                      color: ({
+                        "Ply A":   "#34d399",
+                        "Ply B":   "#fbbf24",
+                        "Ply C":   "#f87171",
+                        "→ Grp A": "#34d399",
+                      })[isTop ? topTag : botTag] || "#fb923c"
                     }}>
                       {isTop ? topTag : botTag}
                     </td>
