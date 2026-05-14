@@ -680,21 +680,21 @@ function PlayoffPanel({ title, accent, data, onDataChange, locked }) {
   );
 }
 
-// ─── Playoff Projection Panel (shows seedings + times, no score entry) ─
-function PlayoffProjectionPanel({ title, accent, teams, times }) {
-  const [s1, s2, s3, s4] = teams;
+// ─── Playoff Projection Panel (shows position labels, no team names) ─
+function PlayoffProjectionPanel({ title, accent, seedLabels, times }) {
+  const [s1, s2, s3, s4] = seedLabels || ["","","",""];
   const [t1, t2, tb, tg] = times || [];
   const matchups = [
-    { label:"Semi-Final 1", time:t1, a: s1, b: s4 },
-    { label:"Semi-Final 2", time:t2, a: s2, b: s3 },
-    { label:"Bronze Medal", time:tb, a: "TBD", b: "TBD" },
-    { label:"Gold Medal",   time:tg, a: "TBD", b: "TBD" },
+    { label:"Semi-Final 1", time:t1, a:s1, b:s4 },
+    { label:"Semi-Final 2", time:t2, a:s2, b:s3 },
+    { label:"Bronze Medal", time:tb, a:"TBD", b:"TBD" },
+    { label:"Gold Medal",   time:tg, a:"TBD", b:"TBD" },
   ];
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background:"#0d1b2e", border:"1px solid rgba(251,191,36,0.15)" }}>
-      <div className="px-4 py-3 flex items-center justify-between" style={{ background: accent, opacity:0.85 }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background:"#0d1b2e", border:"1px solid rgba(255,255,255,0.07)" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ background: accent }}>
         <span className="font-bold text-white" style={{ fontSize:14 }}>{title}</span>
-        <span style={{ fontSize:10, color:"rgba(255,255,255,0.7)", fontWeight:600, letterSpacing:"0.08em" }}>PROJECTED</span>
+        <span style={{ fontSize:10, color:"rgba(255,255,255,0.7)", fontWeight:600, letterSpacing:"0.08em" }}>SCHEDULE</span>
       </div>
       <div className="p-4 space-y-3">
         {matchups.map((m, i) => (
@@ -703,9 +703,11 @@ function PlayoffProjectionPanel({ title, accent, teams, times }) {
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
               style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)" }}>
               {m.time && <span style={{ fontSize:10, fontWeight:700, color:"#3a5a8c", fontFamily:"'DM Mono',monospace", minWidth:34, flexShrink:0 }}>{m.time}</span>}
-              <span style={{ flex:1, textAlign:"right", fontSize:12, fontWeight:600, color: i < 2 ? "#c8d8f0" : "#4a5a7c" }}>{m.a || "TBD"}</span>
+              <span style={{ flex:1, textAlign:"right", fontSize:11, fontWeight: i < 2 ? 600 : 400,
+                color: i < 2 ? "#6a8abc" : "#3a5a8c", fontStyle: i >= 2 ? "italic" : "normal" }}>{m.a}</span>
               <span style={{ fontSize:10, color:"#3a5a8c", fontWeight:700, padding:"0 8px" }}>vs</span>
-              <span style={{ flex:1, fontSize:12, fontWeight:600, color: i < 2 ? "#c8d8f0" : "#4a5a7c" }}>{m.b || "TBD"}</span>
+              <span style={{ flex:1, fontSize:11, fontWeight: i < 2 ? 600 : 400,
+                color: i < 2 ? "#6a8abc" : "#3a5a8c", fontStyle: i >= 2 ? "italic" : "normal" }}>{m.b}</span>
             </div>
           </div>
         ))}
@@ -1408,20 +1410,6 @@ export default function HockeyTournament() {
         {/* ── DAY 3 PLAYOFFS ── */}
         {phase === "day3" && (() => {
           const isProjection = pA.teams.length === 0;
-          const day2Started  = gA.teams.length > 0; // advanced from Day 1 to Day 2
-
-          // Only compute projections once Day 2 groups are known
-          const projPA = [], projPB = [], projPC = [];
-          if (day2Started) {
-            const d1Games = [...g1.games, ...g2.games];
-            const projA_games = gA.games.length > 0 ? gA.games : [];
-            const projB_games = gB.games.length > 0 ? gB.games : [];
-            const sA = calcStandings(gA.teams, projA_games, d1Games, swapsA, day2BonusA);
-            const sB = calcStandings(gB.teams, projB_games, d1Games, swapsB, day2BonusB);
-            projPA.push(...sA.slice(0,4).map(s => s.team));
-            projPB.push(...[...sA.slice(4), ...sB.slice(0,2)].map(s => s.team));
-            projPC.push(...sB.slice(2).map(s => s.team));
-          }
 
           const allDone = !isProjection &&
             played(pA.games[3]) && played(pA.games[2]) &&
@@ -1432,15 +1420,12 @@ export default function HockeyTournament() {
             <div>
               {isProjection && (
                 <div className="rounded-xl" style={{
-                  background:"rgba(251,191,36,0.06)", border:"1px solid rgba(251,191,36,0.2)",
-                  padding:"10px 16px", marginBottom:20, fontSize:12, color:"#fbbf24",
+                  background:"rgba(100,160,255,0.05)", border:"1px solid rgba(100,160,255,0.1)",
+                  padding:"10px 16px", marginBottom:20, fontSize:12, color:"#8aaad8",
                   display:"flex", alignItems:"center", gap:8,
                 }}>
-                  <span>⏳</span>
-                  {day2Started
-                    ? <span><strong>Live projection</strong> — seedings update as Saturday scores come in. Advance through Day 2 to lock in brackets.</span>
-                    : <span><strong>TBD</strong> — playoff brackets are not available until Day 1 is completed and Day 2 begins.</span>
-                  }
+                  <span>📋</span>
+                  <span>Playoff brackets will be confirmed once Saturday's results are in and Day 2 is advanced.</span>
                 </div>
               )}
 
@@ -1449,13 +1434,16 @@ export default function HockeyTournament() {
                 {isProjection ? (
                   <>
                     <PlayoffProjectionPanel title="🎖 Playoff C — Sunday 07:00"
-                      accent="linear-gradient(135deg,#7c2d12,#c2410c)" teams={projPC}
+                      accent="linear-gradient(135deg,#7c2d12,#c2410c)"
+                      seedLabels={["Sat. Group B · 3rd","Sat. Group B · 4th","Sat. Group B · 5th","Sat. Group B · 6th"]}
                       times={["07:00","07:55","11:45","12:40"]} />
                     <PlayoffProjectionPanel title="🥈 Playoff B — Sunday 08:35"
-                      accent="linear-gradient(135deg,#374151,#6b7280)" teams={projPB}
+                      accent="linear-gradient(135deg,#374151,#6b7280)"
+                      seedLabels={["Sat. Group A · 5th","Sat. Group A · 6th","Sat. Group B · 1st","Sat. Group B · 2nd"]}
                       times={["08:35","09:30","13:30","14:25"]} />
                     <PlayoffProjectionPanel title="🏆 Playoff A — Sunday 10:10"
-                      accent="linear-gradient(135deg,#b45309,#d97706)" teams={projPA}
+                      accent="linear-gradient(135deg,#b45309,#d97706)"
+                      seedLabels={["Sat. Group A · 1st","Sat. Group A · 2nd","Sat. Group A · 3rd","Sat. Group A · 4th"]}
                       times={["10:10","11:05","15:05","16:00"]} />
                   </>
                 ) : (
