@@ -91,10 +91,10 @@ const loser = g => {
 const swapKey = (a, b) => [a, b].sort().join('|||');
 
 // Build mini-stats using only games between teams in this group
-function miniStats(group, allGames) {
+function miniStats(group, allGames, bonuses = {}) {
   const teamSet = new Set(group.map(s => s.team));
   const m = {};
-  group.forEach(s => m[s.team] = { pts:0, gf:0, ga:0 });
+  group.forEach(s => m[s.team] = { pts: bonuses[s.team] || 0, gf:0, ga:0 });
   allGames.filter(g =>
     played(g) && teamSet.has(g.team1) && teamSet.has(g.team2)
   ).forEach(g => {
@@ -160,9 +160,9 @@ function resolveByOverall(group, m, swaps) {
 // 1. Compute internal (h2h) points using only games between teams in this group
 // 2. If a sub-group emerges with fewer teams, recurse into it (using only their games)
 // 3. If all teams still tied on internal points, fall back to overall tiebreakers
-function resolveGroup(group, allGames, swaps) {
+function resolveGroup(group, allGames, swaps, bonuses = {}) {
   if (group.length === 1) return group;
-  const m = miniStats(group, allGames);
+  const m = miniStats(group, allGames, bonuses);
   const byInternalPts = [...group].sort((a, b) => m[b.team].pts - m[a.team].pts);
   const result = [];
   let i = 0;
@@ -175,7 +175,7 @@ function resolveGroup(group, allGames, swaps) {
       result.push(sub[0]);
     } else if (sub.length < group.length) {
       // Sub-group is smaller — recurse using only games between sub-group teams
-      result.push(...resolveGroup(sub, allGames, swaps));
+      result.push(...resolveGroup(sub, allGames, swaps, bonuses));
     } else {
       // All teams still tied on internal pts — fall to overall tiebreakers
       result.push(...resolveByOverall(sub, m, swaps));
@@ -185,9 +185,9 @@ function resolveGroup(group, allGames, swaps) {
   return result;
 }
 
-function calcStandings(teams, games, prevGames = [], swaps = {}) {
+function calcStandings(teams, games, prevGames = [], swaps = {}, bonuses = {}) {
   const r = {};
-  teams.forEach(t => r[t] = { team:t, pts:0, gp:0, w:0, otw:0, t:0, otl:0, l:0, gf:0, ga:0, pim:0 });
+  teams.forEach(t => r[t] = { team:t, pts: bonuses[t] || 0, gp:0, w:0, otw:0, t:0, otl:0, l:0, gf:0, ga:0, pim:0 });
   games.filter(played).forEach(g => {
     if (!r[g.team1] || !r[g.team2]) return;
     const [a, b] = [+g.s1, +g.s2];
@@ -208,7 +208,7 @@ function calcStandings(teams, games, prevGames = [], swaps = {}) {
   while (i < byPts.length) {
     let j = i + 1;
     while (j < byPts.length && byPts[j].pts === byPts[i].pts) j++;
-    result.push(...resolveGroup(byPts.slice(i, j), allGames, swaps));
+    result.push(...resolveGroup(byPts.slice(i, j), allGames, swaps, bonuses));
     i = j;
   }
   return result;
@@ -372,10 +372,10 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 }
 
 // ─── Standings Table ───────────────────────────────────────────
-function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true }) {
+function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true, bonuses = {} }) {
   const rows = useMemo(
-    () => calcStandings(teams, games, prevGames, swaps),
-    [teams, games, prevGames, swaps] // eslint-disable-line
+    () => calcStandings(teams, games, prevGames, swaps, bonuses),
+    [teams, games, prevGames, swaps, bonuses] // eslint-disable-line
   );
   return (
     <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -406,7 +406,18 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
                   background: isTop ? "rgba(52,211,153,0.06)" : isBot ? "rgba(251,146,60,0.06)" : "transparent",
                 }}>
                   <td className="px-2 py-1.5" style={{ color:"#4a5a7c" }}>{i+1}</td>
-                  <td className="px-2 py-1.5 font-medium truncate" style={{ maxWidth:90, color:"#c8d8f0" }}>{s.team}</td>
+                  <td className="px-2 py-1.5 font-medium" style={{ maxWidth:100, color:"#c8d8f0" }}>
+                    <div className="flex items-center gap-1">
+                      <span className="truncate">{s.team}</span>
+                      {bonuses[s.team] > 0 && (
+                        <span style={{
+                          fontSize:9, fontWeight:700, color:"#34d399",
+                          background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.25)",
+                          borderRadius:4, padding:"0px 4px", flexShrink:0
+                        }}>+{bonuses[s.team]}</span>
+                      )}
+                    </div>
+                  </td>
                   {[s.gp,s.w,s.otw,s.t,s.otl,s.l,s.gf,s.ga,s.pim].map((v, j) => (
                     <td key={j} className="px-1 py-1.5 text-center"
                       style={{ color: j===3 && v>0 ? "#fbbf24" : j===8 && v>0 ? "#f87171" : "#8aa0c8" }}>{v}</td>
@@ -451,7 +462,7 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
 }
 
 // ─── Group Panel ──────────────────────────────────────────────
-function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [], swaps = {}, onSwap }) {
+function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag, botTag, locked, reorderable, prevGames = [], swaps = {}, onSwap, bonuses = {} }) {
   const upd      = (i, f, v) => onGamesChange(games.map((g, j) => j===i ? {...g,[f]:v} : g));
   const doneCount = games.filter(played).length;
   const canDrag   = !!reorderable;
@@ -577,7 +588,7 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
           </div>
         ))}
         <p className="uppercase tracking-widest mb-2 mt-5" style={{ fontSize:9, color:"#3a5a8c", fontWeight:700 }}>Standings</p>
-        <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} prevGames={prevGames} swaps={swaps} onSwap={onSwap} locked={locked} />
+        <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} prevGames={prevGames} swaps={swaps} onSwap={onSwap} locked={locked} bonuses={bonuses} />
         <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:4 }}>
           <p style={{ fontSize:10, color:"#3a5a8c" }}>
             <strong style={{ color:"#4a6a9c" }}>Points:</strong> Win 3 · OT/SO Win 2 · OT/SO Loss 1 · SO Draw 1 · Loss 0
@@ -702,6 +713,10 @@ export default function HockeyTournament() {
   const makeSwapHandler = (setter) => (key, winner) =>
     setter(prev => ({ ...prev, [key]: winner }));
 
+  // Day 1 bonus points carried into Day 2 (teamName → bonusPoints)
+  const [day2BonusA, setDay2BonusA] = useState({});
+  const [day2BonusB, setDay2BonusB] = useState({});
+
   // ── Auth state ──────────────────────────────────────────────
   const [locked, setLocked]       = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -730,6 +745,7 @@ export default function HockeyTournament() {
     [setGA, setGB].forEach(set => set(p => ({ ...p, games: p.games.map(clearGame) })));
     [setPA, setPB, setPC].forEach(set => set(p => ({ ...p, games: p.games.map(clearPlayoffGame) })));
     setSwaps1({}); setSwaps2({}); setSwapsA({}); setSwapsB({});
+    setDay2BonusA({}); setDay2BonusB({});
     setShowResetModal(false);
     setResetInput("");
   };
@@ -772,10 +788,12 @@ export default function HockeyTournament() {
         if (s.pC)         setPC(s.pC);
         if (s.day2OrderA) setDay2OrderA(s.day2OrderA);
         if (s.day2OrderB) setDay2OrderB(s.day2OrderB);
-        if (s.swaps1)     setSwaps1(s.swaps1);
-        if (s.swaps2)     setSwaps2(s.swaps2);
-        if (s.swapsA)     setSwapsA(s.swapsA);
-        if (s.swapsB)     setSwapsB(s.swapsB);
+        if (s.swaps1)      setSwaps1(s.swaps1);
+        if (s.swaps2)      setSwaps2(s.swaps2);
+        if (s.swapsA)      setSwapsA(s.swapsA);
+        if (s.swapsB)      setSwapsB(s.swapsB);
+        if (s.day2BonusA)  setDay2BonusA(s.day2BonusA);
+        if (s.day2BonusB)  setDay2BonusB(s.day2BonusB);
       }
       setInitialized(true);
     });
@@ -791,11 +809,11 @@ export default function HockeyTournament() {
       suppressUpdate.current = true;
       set(ref(db, 'tournament'), {
         g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB,
-        swaps1, swaps2, swapsA, swapsB
+        swaps1, swaps2, swapsA, swapsB, day2BonusA, day2BonusB
       }).catch(console.error);
     }, 800);
     return () => clearTimeout(saveTimer.current);
-  }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB]); // eslint-disable-line
+  }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB, day2BonusA, day2BonusB]); // eslint-disable-line
 
   // ── Phase helpers ────────────────────────────────────────────
   const phaseEnabled = {
@@ -811,6 +829,16 @@ export default function HockeyTournament() {
     ];
     const tA = [...s1.slice(0,3), ...s2.slice(0,3)].map(s => s.team);
     const tB = [...s1.slice(3),   ...s2.slice(3)  ].map(s => s.team);
+    // Bonus based on rank within each Day 1 group's top/bottom half: 1st=+2, 2nd=+1, 3rd=0
+    const bonusA = {}, bonusB = {};
+    [s1.slice(0,3), s2.slice(0,3)].forEach(grp =>
+      grp.forEach((s, i) => { bonusA[s.team] = [2,1,0][i]; })
+    );
+    [s1.slice(3), s2.slice(3)].forEach(grp =>
+      grp.forEach((s, i) => { bonusB[s.team] = [2,1,0][i]; })
+    );
+    setDay2BonusA(bonusA);
+    setDay2BonusB(bonusB);
     setGA({ teams:tA, games:buildDay2GamesFromOrder(tA, DAY2_GRUPP_A_SCHED, day2OrderA, "gA_") });
     setGB({ teams:tB, games:buildDay2GamesFromOrder(tB, DAY2_GRUPP_B_SCHED, day2OrderB, "gB_") });
     setPhase("day2");
@@ -819,8 +847,8 @@ export default function HockeyTournament() {
   const goDay3 = () => {
     const d1Games = [...g1.games, ...g2.games];
     const [sA, sB] = [
-      calcStandings(gA.teams, gA.games, d1Games, swapsA),
-      calcStandings(gB.teams, gB.games, d1Games, swapsB),
+      calcStandings(gA.teams, gA.games, d1Games, swapsA, day2BonusA),
+      calcStandings(gB.teams, gB.games, d1Games, swapsB, day2BonusB),
     ];
     const tA = sA.slice(0,4).map(s => s.team);
     const tB = [...sA.slice(4), ...sB.slice(0,2)].map(s => s.team);
@@ -1119,12 +1147,23 @@ export default function HockeyTournament() {
 
         {/* ── DAY 2 ── */}
         {phase === "day2" && (() => {
-          const s1 = calcStandings(g1.teams, g1.games);
-          const s2 = calcStandings(g2.teams, g2.games);
+          const s1 = calcStandings(g1.teams, g1.games, [], swaps1);
+          const s2 = calcStandings(g2.teams, g2.games, [], swaps2);
           // projA = [M1,M2,M3, A1,A2,A3], projB = [M4,M5,M6, A4,A5,A6]
           const projA = [...s1.slice(0,3), ...s2.slice(0,3)].map(s => s.team);
           const projB = [...s1.slice(3),   ...s2.slice(3)  ].map(s => s.team);
           const isProjection = gA.teams.length === 0;
+
+          // Projected bonuses (live) or locked-in bonuses (after advancing)
+          const projBonusA = {}, projBonusB = {};
+          [s1.slice(0,3), s2.slice(0,3)].forEach(grp =>
+            grp.forEach((s, i) => { projBonusA[s.team] = [2,1,0][i]; })
+          );
+          [s1.slice(3), s2.slice(3)].forEach(grp =>
+            grp.forEach((s, i) => { projBonusB[s.team] = [2,1,0][i]; })
+          );
+          const bonusA = isProjection ? projBonusA : day2BonusA;
+          const bonusB = isProjection ? projBonusB : day2BonusB;
 
           return (
             <div>
@@ -1157,6 +1196,19 @@ export default function HockeyTournament() {
                 </div>
               )}
 
+              {/* Bonus explanation banner */}
+              <div className="rounded-xl" style={{
+                background:"rgba(52,211,153,0.05)", border:"1px solid rgba(52,211,153,0.15)",
+                padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8", lineHeight:1.7
+              }}>
+                <strong style={{color:"#34d399"}}>🎯 Day 1 bonus points</strong>
+                {" — "}Teams carry bonus points into Saturday based on their finishing position within their Friday group:
+                {" "}<strong style={{color:"#34d399"}}>1st place +2 pts</strong>
+                {" · "}<strong style={{color:"#86efac"}}>2nd place +1 pt</strong>
+                {" · "}<strong style={{color:"#8aaad8"}}>3rd place 0 pts</strong>.
+                {" "}Bonus applies equally to both Saturday groups and counts as normal points in all tiebreakers.
+              </div>
+
               {/* Group B shown first — plays in the morning */}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:20, marginBottom:20 }}>
                 {isProjection ? (
@@ -1167,14 +1219,14 @@ export default function HockeyTournament() {
                       onGamesChange={newGames => setDay2OrderB(recoverOrder(newGames, "projB_"))}
                       cutAt={2} topTag="Ply B" botTag="Ply C"
                       locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} />
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} />
                     <GroupPanel title="Saturday · Group A (projected)" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={projA}
                       games={buildDay2GamesFromOrder(projA, DAY2_GRUPP_A_SCHED, day2OrderA, "projA_")}
                       onGamesChange={newGames => setDay2OrderA(recoverOrder(newGames, "projA_"))}
                       cutAt={4} topTag="Ply A" botTag="Ply B"
                       locked={true} reorderable={!locked} prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} />
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} />
                   </>
                 ) : (
                   <>
@@ -1183,13 +1235,13 @@ export default function HockeyTournament() {
                       onGamesChange={games => setGB(p => ({...p,games}))}
                       cutAt={2} topTag="Ply B" botTag="Ply C" locked={locked} reorderable={!locked}
                       prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} />
+                      swaps={swapsB} onSwap={makeSwapHandler(setSwapsB)} bonuses={bonusB} />
                     <GroupPanel title="Saturday · Group A" accent="linear-gradient(135deg,#78350f,#d97706)"
                       teams={gA.teams} games={gA.games}
                       onGamesChange={games => setGA(p => ({...p,games}))}
                       cutAt={4} topTag="Ply A" botTag="Ply B" locked={locked} reorderable={!locked}
                       prevGames={[...g1.games, ...g2.games]}
-                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} />
+                      swaps={swapsA} onSwap={makeSwapHandler(setSwapsA)} bonuses={bonusA} />
                   </>
                 )}
               </div>
@@ -1215,8 +1267,8 @@ export default function HockeyTournament() {
           const projA_games = gA.games.length > 0 ? gA.games : [];
           const projB_games = gB.games.length > 0 ? gB.games : [];
           const d1Games    = [...g1.games, ...g2.games];
-          const sA = calcStandings(projA_teams, projA_games, d1Games, swapsA);
-          const sB = calcStandings(projB_teams, projB_games, d1Games, swapsB);
+          const sA = calcStandings(projA_teams, projA_games, d1Games, swapsA, day2BonusA);
+          const sB = calcStandings(projB_teams, projB_games, d1Games, swapsB, day2BonusB);
           const projPA = sA.slice(0,4).map(s => s.team);
           const projPB = [...sA.slice(4), ...sB.slice(0,2)].map(s => s.team);
           const projPC = sB.slice(2).map(s => s.team);
