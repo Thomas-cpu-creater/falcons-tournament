@@ -1189,7 +1189,7 @@ export default function HockeyTournament() {
                 background:"rgba(100,160,255,0.05)", border:"1px solid rgba(100,160,255,0.1)",
                 padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8", lineHeight:1.7
               }}>
-                <strong style={{color:"#c8d8f0"}}>Day 3 Placement: </strong>
+                <strong style={{color:"#c8d8f0"}}>Day 3 Playoff Placement: </strong>
                 <span style={{color:"#34d399"}}>Top 4 Group A → Playoff A</span>
                 {" · "}
                 <span style={{color:"#fbbf24"}}>Bottom 2 Group A + Top 2 Group B → Playoff B</span>
