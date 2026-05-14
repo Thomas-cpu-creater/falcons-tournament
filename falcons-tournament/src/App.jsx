@@ -588,6 +588,18 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
           </div>
         ))}
         <p className="uppercase tracking-widest mb-2 mt-5" style={{ fontSize:9, color:"#3a5a8c", fontWeight:700 }}>Standings</p>
+        {Object.keys(bonuses).length > 0 && (
+          <div className="rounded-lg" style={{
+            background:"rgba(52,211,153,0.05)", border:"1px solid rgba(52,211,153,0.15)",
+            padding:"8px 12px", marginBottom:8, fontSize:11, color:"#8aaad8", lineHeight:1.6
+          }}>
+            <strong style={{color:"#34d399"}}>🎯 Day 1 bonus:</strong>
+            {" "}1st place <strong style={{color:"#34d399"}}>+2 pts</strong>
+            {" · "}2nd place <strong style={{color:"#86efac"}}>+1 pt</strong>
+            {" · "}3rd place <strong style={{color:"#8aaad8"}}>0 pts</strong>.
+            {" "}Counts as normal points in all tiebreakers.
+          </div>
+        )}
         <StandingsTable teams={teams} games={games} cutAt={cutAt} topTag={topTag} botTag={botTag} prevGames={prevGames} swaps={swaps} onSwap={onSwap} locked={locked} bonuses={bonuses} />
         <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:4 }}>
           <p style={{ fontSize:10, color:"#3a5a8c" }}>
@@ -1195,19 +1207,6 @@ export default function HockeyTournament() {
                   <span><strong>Live projection</strong> — based on current Day 1 standings. Advance from Day 1 to lock in groups.</span>
                 </div>
               )}
-
-              {/* Bonus explanation banner */}
-              <div className="rounded-xl" style={{
-                background:"rgba(52,211,153,0.05)", border:"1px solid rgba(52,211,153,0.15)",
-                padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8", lineHeight:1.7
-              }}>
-                <strong style={{color:"#34d399"}}>🎯 Day 1 bonus points</strong>
-                {" — "}Teams carry bonus points into Saturday based on their finishing position within their Friday group:
-                {" "}<strong style={{color:"#34d399"}}>1st place +2 pts</strong>
-                {" · "}<strong style={{color:"#86efac"}}>2nd place +1 pt</strong>
-                {" · "}<strong style={{color:"#8aaad8"}}>3rd place 0 pts</strong>.
-                {" "}Bonus applies equally to both Saturday groups and counts as normal points in all tiebreakers.
-              </div>
 
               {/* Group B shown first — plays in the morning */}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:20, marginBottom:20 }}>
