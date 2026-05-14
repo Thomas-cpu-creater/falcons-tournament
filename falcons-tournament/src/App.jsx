@@ -95,10 +95,10 @@ const loser = g => {
 const swapKey = (a, b) => [a, b].sort().join('|||');
 
 // Build mini-stats using only games between teams in this group
-function miniStats(group, allGames, bonuses = {}) {
+function miniStats(group, allGames) {
   const teamSet = new Set(group.map(s => s.team));
   const m = {};
-  group.forEach(s => m[s.team] = { pts: bonuses[s.team] || 0, gf:0, ga:0 });
+  group.forEach(s => m[s.team] = { pts:0, gf:0, ga:0 });
   allGames.filter(g =>
     played(g) && teamSet.has(g.team1) && teamSet.has(g.team2)
   ).forEach(g => {
@@ -166,7 +166,7 @@ function resolveByOverall(group, m, swaps) {
 // 3. If all teams still tied on internal points, fall back to overall tiebreakers
 function resolveGroup(group, allGames, swaps, bonuses = {}) {
   if (group.length === 1) return group;
-  const m = miniStats(group, allGames, bonuses);
+  const m = miniStats(group, allGames);
   const byInternalPts = [...group].sort((a, b) => m[b.team].pts - m[a.team].pts);
   const result = [];
   let i = 0;
