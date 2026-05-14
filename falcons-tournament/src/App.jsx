@@ -896,10 +896,16 @@ export default function HockeyTournament() {
   const clearAllScores = () => {
     setG1({ ...DAY1_G1, games: DAY1_G1.games.map(clearGame) });
     setG2({ ...DAY1_G2, games: DAY1_G2.games.map(clearGame) });
-    [setGA, setGB].forEach(set => set(p => ({ ...p, games: p.games.map(clearGame) })));
-    [setPA, setPB, setPC].forEach(set => set(p => ({ ...p, games: p.games.map(clearPlayoffGame) })));
+    setGA({ teams:[], games:[] });
+    setGB({ teams:[], games:[] });
+    setPA({ teams:[], games:[] });
+    setPB({ teams:[], games:[] });
+    setPC({ teams:[], games:[] });
     setSwaps1({}); setSwaps2({}); setSwapsA({}); setSwapsB({});
     setDay2BonusA({}); setDay2BonusB({});
+    setDay2OrderA([0,1,2,3,4,5,6,7,8]);
+    setDay2OrderB([0,1,2,3,4,5,6,7,8]);
+    setPhase("day1");
     setShowResetModal(false);
     setResetInput("");
   };
@@ -955,9 +961,11 @@ export default function HockeyTournament() {
   }, []);
 
   // Save to Firebase whenever state changes (after first load) — debounced 800ms
+  // Only write when unlocked (admin) — prevents spectator devices from overwriting data
   const saveTimer = useRef(null);
   useEffect(() => {
     if (!initialized) return;
+    if (locked) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       suppressUpdate.current = true;
@@ -967,7 +975,7 @@ export default function HockeyTournament() {
       }).catch(console.error);
     }, 800);
     return () => clearTimeout(saveTimer.current);
-  }, [phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB, day2BonusA, day2BonusB]); // eslint-disable-line
+  }, [locked, phase, g1, g2, gA, gB, pA, pB, pC, day2OrderA, day2OrderB, swaps1, swaps2, swapsA, swapsB, day2BonusA, day2BonusB]); // eslint-disable-line
 
   // ── Phase helpers ────────────────────────────────────────────
   const phaseEnabled = {
