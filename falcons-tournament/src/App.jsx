@@ -652,7 +652,7 @@ function PlayoffPanel({ title, accent, data, onDataChange, locked }) {
               style={{ fontSize:9, color: i >= 2 ? "#f59e0b" : "#3a5a8c", fontWeight:700 }}>
               {g.label}
             </p>
-            <GameRow game={g} onUpdate={(f,v) => upd(i,f,v)} isPlayoff={i < 2} locked={locked} />
+            <GameRow game={g} onUpdate={(f,v) => upd(i,f,v)} isPlayoff={true} locked={locked} />
           </div>
         ))}
         {finished && (
