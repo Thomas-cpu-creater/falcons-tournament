@@ -55,8 +55,9 @@ const DAY2_GRUPP_A_SCHED = [
 const makeDay2Games = (teams, sched, pfx) =>
   sched.map(([i,j,time], k) => ({ id:`${pfx}${k}`, time, team1:teams[i], team2:teams[j], s1:"", s2:"", soResult:null, pim1:0, pim2:0 }));
 
-// All 12 teams in fixed display order (Group 1 first, then Group 2)
-const ALL_TEAMS = [...DAY1_G1.teams, ...DAY1_G2.teams];
+// All 12 teams sorted alphabetically
+const ALL_TEAMS = [...DAY1_G1.teams, ...DAY1_G2.teams].sort((a, b) =>
+  a.localeCompare(b, undefined, {numeric:true}));
 
 // ─── Pure helpers ───────────────────────────────────────────────
 // Unequal scores → played immediately (ot flag just affects points).
@@ -231,8 +232,13 @@ const makePlayoffGames = (seeds, pfx, times) => {
 function refreshFinals(games) {
   const g = [...games];
   if (played(g[0]) && played(g[1])) {
-    g[2] = { ...g[2], team1:loser(g[0]),   team2:loser(g[1]),   s1:"", s2:"" };
-    g[3] = { ...g[3], team1:winner(g[0]), team2:winner(g[1]), s1:"", s2:"" };
+    const b1 = loser(g[0]),    b2 = loser(g[1]);
+    const gld1 = winner(g[0]), gld2 = winner(g[1]);
+    // Only wipe scores if teams changed (e.g. a SF result was corrected)
+    const bChanged   = g[2].team1 !== b1   || g[2].team2 !== b2;
+    const goldChanged = g[3].team1 !== gld1 || g[3].team2 !== gld2;
+    g[2] = { ...g[2], team1:b1,   team2:b2,   ...(bChanged    ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
+    g[3] = { ...g[3], team1:gld1, team2:gld2, ...(goldChanged ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
   } else {
     g[2] = { ...g[2], team1:null, team2:null, s1:"", s2:"", soResult:null, pim1:0, pim2:0 };
     g[3] = { ...g[3], team1:null, team2:null, s1:"", s2:"", soResult:null, pim1:0, pim2:0 };
