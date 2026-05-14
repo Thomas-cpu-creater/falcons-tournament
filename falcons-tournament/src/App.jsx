@@ -55,6 +55,9 @@ const DAY2_GRUPP_A_SCHED = [
 const makeDay2Games = (teams, sched, pfx) =>
   sched.map(([i,j,time], k) => ({ id:`${pfx}${k}`, time, team1:teams[i], team2:teams[j], s1:"", s2:"", soResult:null, pim1:0, pim2:0 }));
 
+// All 12 teams in fixed display order (Group 1 first, then Group 2)
+const ALL_TEAMS = [...DAY1_G1.teams, ...DAY1_G2.teams];
+
 // ─── Pure helpers ───────────────────────────────────────────────
 // Unequal scores → played immediately (ot flag just affects points).
 // Equal scores → played only once a soResult is chosen ('team1' | 'tie' | 'team2').
@@ -704,9 +707,135 @@ function PlayoffProjectionPanel({ title, accent, teams, times }) {
   );
 }
 
+// ─── Team schedule helpers ────────────────────────────────────
+function getResultForTeam(game, team) {
+  if (!played(game)) return null;
+  const a = +game.s1, b = +game.s2;
+  const isT1 = game.team1 === team;
+  if (a === b) {
+    if (game.soResult === "tie") return { label:"SO TIE", color:"#fbbf24" };
+    const soWon = (game.soResult === "team1") === isT1;
+    return soWon ? { label:"SO W", color:"#4ade80" } : { label:"SO L", color:"#fb923c" };
+  }
+  const mine = isT1 ? a : b, theirs = isT1 ? b : a;
+  return mine > theirs ? { label:"W", color:"#4ade80" } : { label:"L", color:"#f87171" };
+}
+
+// ─── Team Card ────────────────────────────────────────────────
+function TeamCard({ team, schedule }) {
+  const [open, setOpen] = useState(false);
+  const playedGames = schedule.filter(g => played(g) && !g.projected);
+  const gp = playedGames.length;
+  const pts = playedGames.reduce((acc, g) => {
+    const res = getResultForTeam(g, team);
+    if (!res) return acc;
+    if (res.label === "W")      return acc + 3;
+    if (res.label === "SO W")   return acc + 2;
+    if (res.label === "SO TIE") return acc + 1;
+    if (res.label === "SO L")   return acc + 1;
+    return acc;
+  }, 0);
+
+  // Group games by day
+  const byDay = { Friday:[], Saturday:[], Sunday:[] };
+  schedule.forEach(g => { if (g.dayLabel) byDay[g.dayLabel].push(g); });
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{
+      background:"#0d1b2e", border:"1px solid rgba(255,255,255,0.07)", marginBottom:10,
+    }}>
+      {/* Header */}
+      <button onClick={() => setOpen(o => !o)} style={{
+        width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"14px 16px", background:"transparent", border:"none", cursor:"pointer",
+        fontFamily:"'DM Sans', sans-serif",
+      }}>
+        <span style={{ fontWeight:700, fontSize:15, color:"#e8f4ff" }}>{team}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:12, color:"#4a6a9c" }}>
+            {gp > 0 ? `${gp} GP · ${pts} pts` : "No results yet"}
+          </span>
+          <span style={{ fontSize:12, color:"#3a5a8c" }}>{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {/* Expanded game list */}
+      {open && (
+        <div style={{ borderTop:"1px solid rgba(255,255,255,0.06)", padding:"12px 16px" }}>
+          {["Friday","Saturday","Sunday"].map(day => {
+            const games = byDay[day];
+            if (games.length === 0) return null;
+            return (
+              <div key={day} style={{ marginBottom:12 }}>
+                <p style={{ fontSize:9, fontWeight:700, color:"#3a5a8c", letterSpacing:"0.1em",
+                  textTransform:"uppercase", marginBottom:8 }}>{day}</p>
+                {games.map(g => {
+                  const opp = g.team1 === team ? g.team2 : g.team1;
+                  const res = getResultForTeam(g, team);
+                  const isPlayed = played(g) && !g.projected;
+                  const myScore = g.team1 === team ? g.s1 : g.s2;
+                  const theirScore = g.team1 === team ? g.s2 : g.s1;
+                  return (
+                    <div key={g.id} style={{
+                      display:"flex", alignItems:"center", gap:8,
+                      padding:"8px 10px", borderRadius:8, marginBottom:4,
+                      background: isPlayed ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.02)",
+                      border:"1px solid rgba(255,255,255,0.05)",
+                    }}>
+                      {/* Time */}
+                      <span style={{ fontSize:10, fontWeight:700, color:"#3a5a8c",
+                        fontFamily:"'DM Mono',monospace", minWidth:34, flexShrink:0 }}>
+                        {g.time || "—"}
+                      </span>
+                      {/* Game label (playoffs only) */}
+                      {g.label && (
+                        <span style={{ fontSize:9, color:"#f59e0b", fontWeight:600,
+                          flexShrink:0, background:"rgba(245,158,11,0.1)",
+                          padding:"1px 5px", borderRadius:4 }}>
+                          {g.label}
+                        </span>
+                      )}
+                      {/* Opponent */}
+                      <span style={{ flex:1, fontSize:12, fontWeight:500,
+                        color: isPlayed ? "#c8d8f0" : "#6a8abc" }}>
+                        vs {opp || "TBD"}
+                      </span>
+                      {/* Score */}
+                      {isPlayed && (
+                        <span style={{ fontSize:13, fontWeight:700, color:"#c8d8f0",
+                          fontFamily:"'DM Mono',monospace" }}>
+                          {myScore}–{theirScore}
+                        </span>
+                      )}
+                      {/* Result badge */}
+                      {res && (
+                        <span style={{
+                          fontSize:9, fontWeight:700, color:res.color,
+                          background:`${res.color}18`, border:`1px solid ${res.color}40`,
+                          borderRadius:4, padding:"1px 5px", flexShrink:0,
+                        }}>{res.label}</span>
+                      )}
+                      {/* Projected badge */}
+                      {g.projected && (
+                        <span style={{ fontSize:9, color:"#fbbf24", fontWeight:600,
+                          background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)",
+                          borderRadius:4, padding:"1px 5px", flexShrink:0 }}>proj</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────
-const PHASES  = ["day1","day2","day3"];
-const PLABELS = ["Day 1 · Friday","Day 2 · Saturday","Day 3 · Playoffs"];
+const PHASES  = ["day1","day2","day3","teams"];
+const PLABELS = ["Day 1 · Friday","Day 2 · Saturday","Day 3 · Playoffs","Teams"];
 
 export default function HockeyTournament() {
   const [phase, setPhase] = useState("day1");
@@ -835,9 +964,10 @@ export default function HockeyTournament() {
 
   // ── Phase helpers ────────────────────────────────────────────
   const phaseEnabled = {
-    day1: true,
-    day2: true,
-    day3: true,
+    day1:  true,
+    day2:  true,
+    day3:  true,
+    teams: true,
   };
 
   const goDay2 = () => {
@@ -1337,6 +1467,64 @@ export default function HockeyTournament() {
                   <div style={{ fontSize:14, color:"#d97706", fontWeight:600 }}>Medal Ceremony — 16:40</div>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* ── TEAMS ── */}
+        {phase === "teams" && (() => {
+          // Collect projected Day 2 games if not yet advanced
+          const isD2Proj = gA.teams.length === 0;
+          let d2ProjGames = [];
+          if (isD2Proj) {
+            const s1 = calcStandings(g1.teams, g1.games, [], swaps1);
+            const s2 = calcStandings(g2.teams, g2.games, [], swaps2);
+            const projA = [...s1.slice(0,3), ...s2.slice(0,3)].map(s => s.team);
+            const projB = [...s1.slice(3),   ...s2.slice(3)  ].map(s => s.team);
+            d2ProjGames = [
+              ...buildDay2GamesFromOrder(projA, DAY2_GRUPP_A_SCHED, day2OrderA, "ptA_"),
+              ...buildDay2GamesFromOrder(projB, DAY2_GRUPP_B_SCHED, day2OrderB, "ptB_"),
+            ].map(g => ({ ...g, projected:true }));
+          }
+
+          // Build schedule per team
+          const scheduleFor = (team) => {
+            const result = [];
+            // Day 1
+            [...g1.games, ...g2.games].forEach(g => {
+              if (g.team1 === team || g.team2 === team)
+                result.push({ ...g, dayLabel:"Friday" });
+            });
+            // Day 2 — real or projected
+            if (isD2Proj) {
+              d2ProjGames.filter(g => g.team1 === team || g.team2 === team)
+                .forEach(g => result.push({ ...g, dayLabel:"Saturday" }));
+            } else {
+              [...gA.games, ...gB.games].forEach(g => {
+                if (g.team1 === team || g.team2 === team)
+                  result.push({ ...g, dayLabel:"Saturday" });
+              });
+            }
+            // Day 3 — only games where team is actually named
+            [...pA.games, ...pB.games, ...pC.games].forEach(g => {
+              if (g.team1 && (g.team1 === team || g.team2 === team))
+                result.push({ ...g, dayLabel:"Sunday" });
+            });
+            return result;
+          };
+
+          return (
+            <div>
+              <div className="rounded-xl" style={{
+                background:"rgba(100,160,255,0.05)", border:"1px solid rgba(100,160,255,0.1)",
+                padding:"12px 18px", marginBottom:20, fontSize:13, color:"#8aaad8",
+              }}>
+                Tap a team to see their full schedule — results, upcoming games and playoff fixtures.
+                {isD2Proj && <span style={{ color:"#fbbf24" }}> Saturday matchups are projected until Day 1 is finalised.</span>}
+              </div>
+              {ALL_TEAMS.map(team => (
+                <TeamCard key={team} team={team} schedule={scheduleFor(team)} />
+              ))}
             </div>
           );
         })()}
