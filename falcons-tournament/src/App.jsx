@@ -1408,20 +1408,20 @@ export default function HockeyTournament() {
         {/* ── DAY 3 PLAYOFFS ── */}
         {phase === "day3" && (() => {
           const isProjection = pA.teams.length === 0;
+          const day2Started  = gA.teams.length > 0; // advanced from Day 1 to Day 2
 
-          // Compute projected playoff seeds from whatever data exists
-          const s1 = calcStandings(g1.teams, g1.games);
-          const s2 = calcStandings(g2.teams, g2.games);
-          const projA_teams = gA.teams.length > 0 ? gA.teams : [...s1.slice(0,3), ...s2.slice(0,3)].map(s => s.team);
-          const projB_teams = gB.teams.length > 0 ? gB.teams : [...s1.slice(3),   ...s2.slice(3)  ].map(s => s.team);
-          const projA_games = gA.games.length > 0 ? gA.games : [];
-          const projB_games = gB.games.length > 0 ? gB.games : [];
-          const d1Games    = [...g1.games, ...g2.games];
-          const sA = calcStandings(projA_teams, projA_games, d1Games, swapsA, day2BonusA);
-          const sB = calcStandings(projB_teams, projB_games, d1Games, swapsB, day2BonusB);
-          const projPA = sA.slice(0,4).map(s => s.team);
-          const projPB = [...sA.slice(4), ...sB.slice(0,2)].map(s => s.team);
-          const projPC = sB.slice(2).map(s => s.team);
+          // Only compute projections once Day 2 groups are known
+          const projPA = [], projPB = [], projPC = [];
+          if (day2Started) {
+            const d1Games = [...g1.games, ...g2.games];
+            const projA_games = gA.games.length > 0 ? gA.games : [];
+            const projB_games = gB.games.length > 0 ? gB.games : [];
+            const sA = calcStandings(gA.teams, projA_games, d1Games, swapsA, day2BonusA);
+            const sB = calcStandings(gB.teams, projB_games, d1Games, swapsB, day2BonusB);
+            projPA.push(...sA.slice(0,4).map(s => s.team));
+            projPB.push(...[...sA.slice(4), ...sB.slice(0,2)].map(s => s.team));
+            projPC.push(...sB.slice(2).map(s => s.team));
+          }
 
           const allDone = !isProjection &&
             played(pA.games[3]) && played(pA.games[2]) &&
@@ -1437,7 +1437,10 @@ export default function HockeyTournament() {
                   display:"flex", alignItems:"center", gap:8,
                 }}>
                   <span>⏳</span>
-                  <span><strong>Live projection</strong> — seedings update as scores come in. Advance through Day 2 to lock in brackets.</span>
+                  {day2Started
+                    ? <span><strong>Live projection</strong> — seedings update as Saturday scores come in. Advance through Day 2 to lock in brackets.</span>
+                    : <span><strong>TBD</strong> — playoff brackets are not available until Day 1 is completed and Day 2 begins.</span>
+                  }
                 </div>
               )}
 
