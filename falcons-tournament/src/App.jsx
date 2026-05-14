@@ -376,6 +376,7 @@ function GameRow({ game, onUpdate, isPlayoff = false, locked = false }) {
 
 // ─── Standings Table ───────────────────────────────────────────
 function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], swaps = {}, onSwap, locked = true, bonuses = {} }) {
+  const allGamesPlayed = games.every(g => played(g));
   const rows = useMemo(
     () => calcStandings(teams, games, prevGames, swaps, bonuses),
     [teams, games, prevGames, swaps, bonuses] // eslint-disable-line
@@ -400,7 +401,7 @@ function StandingsTable({ teams, games, cutAt, topTag, botTag, prevGames = [], s
           {rows.map((s, i) => {
             const isTop = cutAt && i < cutAt;
             const isBot = cutAt && i >= cutAt;
-            const tied = !locked && s._tiedWithNext;
+            const tied = !locked && allGamesPlayed && s._tiedWithNext;
             const colSpan = 11 + (cutAt ? 1 : 0);
             return (
               <>
