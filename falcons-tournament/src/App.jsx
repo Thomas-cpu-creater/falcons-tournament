@@ -644,7 +644,7 @@ function PlayoffPanel({ title, accent, data, onDataChange, locked, times = [] })
           <div key={g.id} className="mb-4">
             <p className="uppercase tracking-widest mb-1.5"
               style={{ fontSize:9, color: i >= 2 ? "#f59e0b" : "#3a5a8c", fontWeight:700 }}>
-              {g.label}
+              {g.label}{times[i] ? <span style={{ color:"#3a5a8c", marginLeft:6, fontFamily:"'DM Mono',monospace" }}>{times[i]}</span> : null}
             </p>
             <GameRow game={g} onUpdate={(f,v) => upd(i,f,v)} isPlayoff={true} locked={locked} />
           </div>
