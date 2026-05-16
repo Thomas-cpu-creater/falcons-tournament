@@ -115,7 +115,6 @@ function miniStats(group, allGames) {
   return m;
 }
 
-// Final fallback when all h2h tiebreakers exhausted — overall GD, GF, PIM, coin flip
 function resolveByOverall(group, m, swaps) {
   const sorted = [...group].sort((a, b) => {
     const ma = m[a.team], mb = m[b.team];
@@ -128,7 +127,6 @@ function resolveByOverall(group, m, swaps) {
     if (a.pim !== b.pim) return a.pim - b.pim;
     return a.team.localeCompare(b.team, undefined, {numeric:true});
   });
-  // Apply coin-flip swaps for completely tied adjacent pairs
   if (Object.keys(swaps).length > 0) {
     let changed = true;
     while (changed) {
@@ -141,15 +139,11 @@ function resolveByOverall(group, m, swaps) {
           (ka.gf-ka.ga) === (kb.gf-kb.ga) && ka.gf === kb.gf && ka.pim === kb.pim;
         if (fullyTied) {
           const k = swapKey(ka.team, kb.team);
-          if (swaps[k] && swaps[k] !== ka.team) {
-            sorted.splice(i, 2, kb, ka);
-            changed = true;
-          }
+          if (swaps[k] && swaps[k] !== ka.team) { sorted.splice(i, 2, kb, ka); changed = true; }
         }
       }
     }
   }
-  // Mark adjacent pairs still completely tied (show coin flip button)
   for (let i = 0; i < sorted.length - 1; i++) {
     const ka = sorted[i], kb = sorted[i+1];
     const ma2 = m[ka.team], mb2 = m[kb.team];
@@ -160,11 +154,7 @@ function resolveByOverall(group, m, swaps) {
   return sorted;
 }
 
-// Recursively resolve a tied group:
-// 1. Compute internal (h2h) points using only games between teams in this group
-// 2. If a sub-group emerges with fewer teams, recurse into it (using only their games)
-// 3. If all teams still tied on internal points, fall back to overall tiebreakers
-function resolveGroup(group, allGames, swaps, bonuses = {}) {
+function resolveGroup(group, allGames, swaps) {
   if (group.length === 1) return group;
   const m = miniStats(group, allGames);
   const byInternalPts = [...group].sort((a, b) => m[b.team].pts - m[a.team].pts);
@@ -175,15 +165,9 @@ function resolveGroup(group, allGames, swaps, bonuses = {}) {
     while (j < byInternalPts.length &&
            m[byInternalPts[j].team].pts === m[byInternalPts[i].team].pts) j++;
     const sub = byInternalPts.slice(i, j);
-    if (sub.length === 1) {
-      result.push(sub[0]);
-    } else if (sub.length < group.length) {
-      // Sub-group is smaller — recurse using only games between sub-group teams
-      result.push(...resolveGroup(sub, allGames, swaps, bonuses));
-    } else {
-      // All teams still tied on internal pts — fall to overall tiebreakers
-      result.push(...resolveByOverall(sub, m, swaps));
-    }
+    if (sub.length === 1) { result.push(sub[0]); }
+    else if (sub.length < group.length) { result.push(...resolveGroup(sub, allGames, swaps)); }
+    else { result.push(...resolveByOverall(sub, m, swaps)); }
     i = j;
   }
   return result;
@@ -212,7 +196,7 @@ function calcStandings(teams, games, prevGames = [], swaps = {}, bonuses = {}) {
   while (i < byPts.length) {
     let j = i + 1;
     while (j < byPts.length && byPts[j].pts === byPts[i].pts) j++;
-    result.push(...resolveGroup(byPts.slice(i, j), allGames, swaps, bonuses));
+    result.push(...resolveGroup(byPts.slice(i, j), allGames, swaps));
     i = j;
   }
   return result;
@@ -234,11 +218,14 @@ function refreshFinals(games) {
   if (played(g[0]) && played(g[1])) {
     const b1 = loser(g[0]),    b2 = loser(g[1]);
     const gld1 = winner(g[0]), gld2 = winner(g[1]);
-    // Only wipe scores if teams changed (e.g. a SF result was corrected)
-    const bChanged   = g[2].team1 !== b1   || g[2].team2 !== b2;
+    const bChanged    = g[2].team1 !== b1   || g[2].team2 !== b2;
     const goldChanged = g[3].team1 !== gld1 || g[3].team2 !== gld2;
-    g[2] = { ...g[2], team1:b1,   team2:b2,   ...(bChanged    ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
-    g[3] = { ...g[3], team1:gld1, team2:gld2, ...(goldChanged ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
+    g[2] = { ...g[2], team1:b1,   team2:b2,
+      time: g[2].time || g[2]._time,
+      ...(bChanged    ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
+    g[3] = { ...g[3], team1:gld1, team2:gld2,
+      time: g[3].time || g[3]._time,
+      ...(goldChanged ? {s1:"", s2:"", soResult:null, pim1:0, pim2:0} : {}) };
   } else {
     g[2] = { ...g[2], team1:null, team2:null, s1:"", s2:"", soResult:null, pim1:0, pim2:0 };
     g[3] = { ...g[3], team1:null, team2:null, s1:"", s2:"", soResult:null, pim1:0, pim2:0 };
@@ -945,9 +932,18 @@ export default function HockeyTournament() {
         if (s.g2)         setG2(s.g2);
         if (s.gA)         setGA(s.gA);
         if (s.gB)         setGB(s.gB);
-        if (s.pA)         setPA(s.pA);
-        if (s.pB)         setPB(s.pB);
-        if (s.pC)         setPC(s.pC);
+        if (s.pA) {
+          const times = ["10:10","11:05","15:05","16:00"];
+          setPA({ ...s.pA, games: s.pA.games.map((g,i) => ({ ...g, time: g.time || times[i] })) });
+        }
+        if (s.pB) {
+          const times = ["08:35","09:30","13:30","14:25"];
+          setPB({ ...s.pB, games: s.pB.games.map((g,i) => ({ ...g, time: g.time || times[i] })) });
+        }
+        if (s.pC) {
+          const times = ["07:00","07:55","11:45","12:40"];
+          setPC({ ...s.pC, games: s.pC.games.map((g,i) => ({ ...g, time: g.time || times[i] })) });
+        }
         if (s.day2OrderA) setDay2OrderA(s.day2OrderA);
         if (s.day2OrderB) setDay2OrderB(s.day2OrderB);
         if (s.swaps1)      setSwaps1(s.swaps1);
