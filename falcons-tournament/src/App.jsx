@@ -618,14 +618,16 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
 }
 
 // ─── Playoff Panel ────────────────────────────────────────────
-function PlayoffPanel({ title, accent, data, onDataChange, locked }) {
+function PlayoffPanel({ title, accent, data, onDataChange, locked, times = [] }) {
   const upd = (i, f, v) => {
     const games = refreshFinals(data.games.map((g, j) => j===i ? {...g,[f]:v} : g));
     onDataChange({ ...data, games });
   };
   const { games } = data;
-  const gold   = games[3];
-  const bronze = games[2];
+  // Always apply hardcoded times — guarantees they show even if Firebase omitted them
+  const gamesWithTimes = games.map((g, i) => ({ ...g, time: g.time || times[i] || g.time }));
+  const gold   = gamesWithTimes[3];
+  const bronze = gamesWithTimes[2];
   const finished = played(gold) && played(bronze);
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background:"#0d1b2e", border:"1px solid rgba(255,255,255,0.07)" }}>
@@ -633,7 +635,7 @@ function PlayoffPanel({ title, accent, data, onDataChange, locked }) {
         <span className="font-bold text-white" style={{ fontSize:15 }}>{title}</span>
       </div>
       <div className="p-4">
-        {games.map((g, i) => (
+        {gamesWithTimes.map((g, i) => (
           <div key={g.id} className="mb-4">
             <p className="uppercase tracking-widest mb-1.5"
               style={{ fontSize:9, color: i >= 2 ? "#f59e0b" : "#3a5a8c", fontWeight:700 }}>
@@ -1446,13 +1448,16 @@ export default function HockeyTournament() {
                   <>
                     <PlayoffPanel title="🎖 Playoff C — Sunday 07:00"
                       accent="linear-gradient(135deg,#7c2d12,#c2410c)"
-                      data={pC} onDataChange={setPC} locked={locked || !d2Ready} />
+                      data={pC} onDataChange={setPC} locked={locked || !d2Ready}
+                      times={["07:00","07:55","11:45","12:40"]} />
                     <PlayoffPanel title="🥈 Playoff B — Sunday 08:35"
                       accent="linear-gradient(135deg,#374151,#6b7280)"
-                      data={pB} onDataChange={setPB} locked={locked || !d2Ready} />
+                      data={pB} onDataChange={setPB} locked={locked || !d2Ready}
+                      times={["08:35","09:30","13:30","14:25"]} />
                     <PlayoffPanel title="🏆 Playoff A — Sunday 10:10"
                       accent="linear-gradient(135deg,#b45309,#d97706)"
-                      data={pA} onDataChange={setPA} locked={locked || !d2Ready} />
+                      data={pA} onDataChange={setPA} locked={locked || !d2Ready}
+                      times={["10:10","11:05","15:05","16:00"]} />
                   </>
                 )}
               </div>
