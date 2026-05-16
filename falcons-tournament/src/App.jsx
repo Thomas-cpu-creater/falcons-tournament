@@ -620,12 +620,17 @@ function GroupPanel({ title, accent, teams, games, onGamesChange, cutAt, topTag,
 // ─── Playoff Panel ────────────────────────────────────────────
 function PlayoffPanel({ title, accent, data, onDataChange, locked, times = [] }) {
   const upd = (i, f, v) => {
-    const games = refreshFinals(data.games.map((g, j) => j===i ? {...g,[f]:v} : g));
-    onDataChange({ ...data, games });
+    // Always stamp times onto all games before processing — ensures they survive Firebase round-trips
+    const stamped = data.games.map((g, j) => ({ ...g, time: g.time || times[j] }));
+    const updated = refreshFinals(stamped.map((g, j) => j===i ? {...g,[f]:v} : g));
+    // Belt-and-suspenders: re-apply times to bronze/gold after refreshFinals
+    if (updated[2]) updated[2] = { ...updated[2], time: updated[2].time || times[2] };
+    if (updated[3]) updated[3] = { ...updated[3], time: updated[3].time || times[3] };
+    onDataChange({ ...data, games: updated });
   };
   const { games } = data;
-  // Always apply hardcoded times — guarantees they show even if Firebase omitted them
-  const gamesWithTimes = games.map((g, i) => ({ ...g, time: g.time || times[i] || g.time }));
+  // Apply times for display (covers initial render before any upd has fired)
+  const gamesWithTimes = games.map((g, i) => ({ ...g, time: g.time || times[i] }));
   const gold   = gamesWithTimes[3];
   const bronze = gamesWithTimes[2];
   const finished = played(gold) && played(bronze);
